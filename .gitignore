@@ -1,0 +1,12 @@
+# Ignorar carpetas generadas por la compilación de colcon
+build/
+install/
+log/
+
+# Ignorar archivos temporales de Python
+*.pyc
+__pycache__/
+
+# Ignorar configuraciones de VSCode
+.vscode/
+
