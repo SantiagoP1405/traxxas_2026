@@ -6,17 +6,17 @@
     <xacro:property name="chassis_length" value="0.31" />
     <xacro:property name="chassis_width" value="0.18" />
     <xacro:property name="chassis_height" value="0.062" />
-    <xacro:property name="chassis_mass" value="7850*${chassis_length * chassis_width * chassis_height}" />
+    <xacro:property name="chassis_mass" value="${7850.0 * chassis_length * chassis_width * chassis_height}" />
     <!-- Front suspension dimensions -->
     <xacro:property name="front_suspension_length" value="0.03" />
     <xacro:property name="front_suspension_width" value="0.1" />
     <xacro:property name="front_suspension_height" value="0.09" />
-    <xacro:property name="front_suspension_mass" value="7850.0*${front_suspension_length * front_suspension_width * front_suspension_height}" />
+    <xacro:property name="front_suspension_mass" value="${7850.0 * front_suspension_length * front_suspension_width * front_suspension_height}" />
     <!--Rear suspension dimensions -->
     <xacro:property name="rear_suspension_length" value="0.05" />
     <xacro:property name="rear_suspension_width" value="0.11" />
     <xacro:property name="rear_suspension_height" value="0.105" />
-    <xacro:property name="rear_suspension_mass" value="7850.0*${rear_suspension_length * rear_suspension_width * rear_suspension_height}" />
+    <xacro:property name="rear_suspension_mass" value="${7850.0 * rear_suspension_length * rear_suspension_width * rear_suspension_height}" />
     <!-- Wheel dimensions -->
     <xacro:property name="wheel_radius" value="0.0535" />
     <xacro:property name="wheel_width" value="0.045" />
