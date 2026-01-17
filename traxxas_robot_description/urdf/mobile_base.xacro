@@ -1,0 +1,268 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+    <!-- PARAMS -->
+    <!-- Chassis dimensions -->
+    <xacro:property name="chassis_length" value="0.31" />
+    <xacro:property name="chassis_width" value="0.18" />
+    <xacro:property name="chassis_height" value="0.062" />
+    <xacro:property name="chassis_mass" value="7850*${chassis_length * chassis_width * chassis_height}" />
+    <!-- Front suspension dimensions -->
+    <xacro:property name="front_suspension_length" value="0.03" />
+    <xacro:property name="front_suspension_width" value="0.1" />
+    <xacro:property name="front_suspension_height" value="0.09" />
+    <xacro:property name="front_suspension_mass" value="7850.0*${front_suspension_length * front_suspension_width * front_suspension_height}" />
+    <!--Rear suspension dimensions -->
+    <xacro:property name="rear_suspension_length" value="0.05" />
+    <xacro:property name="rear_suspension_width" value="0.11" />
+    <xacro:property name="rear_suspension_height" value="0.105" />
+    <xacro:property name="rear_suspension_mass" value="7850.0*${rear_suspension_length * rear_suspension_width * rear_suspension_height}" />
+    <!-- Wheel dimensions -->
+    <xacro:property name="wheel_radius" value="0.0535" />
+    <xacro:property name="wheel_width" value="0.045" />
+    <xacro:property name="wheel_density" value="900.0" />
+    <xacro:property name="wheel_mass" value="${wheel_density * pi * wheel_radius * wheel_radius * wheel_width}" />
+    <xacro:property name="wheel_separation" value="0.28" />
+    <xacro:property name="wheel_offset" value="${chassis_length / 2.0 - wheel_radius}" />
+    <!-- Steering params -->
+    <xacro:property name="max_steering_angle" value="0.5236" />
+    <xacro:property name="max_steering_angular_vel" value="1.570796" />
+    <xacro:property name="max_steering_effort" value="1.0" />
+    <xacro:property name="max_vel" value="15.665470085" />
+    <xacro:property name="max_effort" value="10.0" />
+    <xacro:property name="max_wheel_angular_vel" value="${max_vel / wheel_radius}" />
+    <!-- Front axis -->
+    <xacro:property name="front_wheel_axis_width" value="${wheel_separation - (2 * wheel_width)}" />
+    <xacro:property name="front_wheel_axis_radius" value="0.01" />
+    <!-- Rear axis -->
+    <xacro:property name="rear_wheel_axis_width" value="0.17" />
+    <xacro:property name="rear_wheel_axis_radius" value="0.01" />
+
+    <!-- XACRO FUNCTIONS -->
+    <xacro:macro name="wheel_link" params="prefix">
+        <link name="${prefix}_wheel_link">
+            <xacro:cylinder_inertia m="${wheel_mass}" r="${wheel_radius}" l="${wheel_width}" o_xyz="0.0 0.0 0.0" o_rpy="${pi/2} 0 0" />
+            <visual>
+                <origin xyz="0.0 0.0 0.0" rpy="${pi/2} 0 0" />
+                <geometry>
+                    <cylinder radius="${wheel_radius}" length="${wheel_width}" />
+                </geometry>
+                <material name="green"/>
+            </visual>
+            <collision>
+                <origin xyz="0.0 0.0 0.0" rpy="${pi/2} 0 0" />
+                <geometry>
+                    <sphere radius="${wheel_radius}" />
+                </geometry>
+            </collision>
+        </link>
+    </xacro:macro>
+
+    <xacro:macro name="steering_link" params="prefix">
+        <link name="${prefix}_steering_link">
+            <xacro:cylinder_inertia m="0.01" r="0.01" l="0.001" o_xyz="0.0 0.0 0.0" o_rpy="${pi/2} 0.0 0.0" />
+            <visual>
+                <origin xyz="0.0 0.0 0.0" rpy="${pi / 2.0} 0.0 0.0" />
+                <geometry>
+                    <cylinder radius="0.01" length="0.001" />
+                </geometry>
+                <material name="blue"/>
+            </visual>
+            <collision>
+                <origin xyz="0.0 0.0 0.0" rpy="${pi/2} 0.0 0.0" />
+                <geometry>
+                    <cylinder radius="0.01" length="0.001" />
+                </geometry>
+            </collision>
+        </link>
+    </xacro:macro>
+
+    <!-- LINKS -->
+    <link name="base_footprint"></link>
+    
+    <link name="chassis_link">
+        <xacro:box_inertia m="${chassis_mass}" l="${chassis_length}" w="${chassis_width}" h="${chassis_height}" o_xyz="0.0 0.0 ${chassis_height/2}" o_rpy="0.0 0.0 0.0" />
+        <visual>
+            <origin xyz="0.0 0.0 ${chassis_height/2}" rpy="0.0 0.0 0.0" />
+            <geometry>
+                <box size="${chassis_length} ${chassis_width} ${chassis_height}" />
+            </geometry>
+            <material name="grey"/>
+        </visual>
+        <collision>
+            <origin xyz="0.0 0.0 ${chassis_height/2}" rpy="0.0 0.0 0.0" />
+            <geometry>
+                <box size="${chassis_length} ${chassis_width} ${chassis_height}" />
+            </geometry>
+        </collision>
+    </link>
+
+    <link name="front_suspension_link">
+        <xacro:box_inertia m="${front_suspension_mass}" l="${front_suspension_length}" w="${front_suspension_width}" h="${front_suspension_height}" o_xyz="0.0 0.0 ${front_suspension_height/2}" o_rpy="0.0 0.0 0.0" />
+        <visual>
+            <origin xyz="0.0 0.0 ${front_suspension_height/2}" rpy="0.0 0.0 0.0" />
+            <geometry>
+                <box size="${front_suspension_length} ${front_suspension_width} ${front_suspension_height}" />
+            </geometry>
+            <material name="black"/>
+        </visual>
+        <collision>
+            <origin xyz="0.0 0.0 ${front_suspension_height/2}" rpy="0.0 0.0 0.0" />
+            <geometry>
+                <box size="${front_suspension_length} ${front_suspension_width} ${front_suspension_height}" />
+            </geometry>
+        </collision>
+    </link>
+
+    <link name="rear_suspension_link">
+        <xacro:box_inertia m="${rear_suspension_mass}" l="${rear_suspension_length}" w="${rear_suspension_width}" h="${rear_suspension_height}" o_xyz="0.0 0.0 ${rear_suspension_height/2}" o_rpy="0.0 0.0 0.0" />
+        <visual>
+            <origin xyz="0.0 0.0 ${rear_suspension_height/2}" rpy="0.0 0.0 0.0" />
+            <geometry>
+                <box size="${rear_suspension_length} ${rear_suspension_width} ${rear_suspension_height}" />
+            </geometry>
+            <material name="black"/>
+        </visual>
+        <collision>
+            <origin xyz="0.0 0.0 ${rear_suspension_height/2}" rpy="0.0 0.0 0.0" />
+            <geometry>
+                <box size="${rear_suspension_length} ${rear_suspension_width} ${rear_suspension_height}" />
+            </geometry>
+        </collision>
+    </link>
+
+    <link name="front_axis_link">
+        <xacro:cylinder_inertia m="0.01" r="${front_wheel_axis_radius}" l="${front_wheel_axis_width}" o_xyz="0.0 0.0 0.0" o_rpy="${pi/2} 0 0" />
+        <visual>
+            <origin xyz="0.0 0.0 0.0" rpy="${pi/2} 0 0" />
+            <geometry>
+                <cylinder radius="${front_wheel_axis_radius}" length="${front_wheel_axis_width}" />
+            </geometry>
+            <material name="grey_dark" />
+             
+        </visual>
+        <collision>
+            <origin xyz="0.0 0.0 0.0" rpy="${pi/2} 0 0" />
+            <geometry>
+                <cylinder radius="${front_wheel_axis_radius}" length="${front_wheel_axis_width}" />
+            </geometry>
+        </collision>
+    </link>
+
+    <link name="rear_axis_link">
+        <xacro:cylinder_inertia m="0.01" r="${rear_wheel_axis_radius}" l="${rear_wheel_axis_width}" o_xyz="0.0 0.0 0.0" o_rpy="${pi/2} 0 0" />
+        <visual>
+            <origin xyz="0.0 0.0 0.0" rpy="${pi/2} 0 0" />
+            <geometry>
+                <cylinder radius="${rear_wheel_axis_radius}" length="${rear_wheel_axis_width}" />
+            </geometry>
+            <material name="grey_dark" />
+        </visual>
+        <collision>
+            <origin xyz="0.0 0.0 0.0" rpy="${pi/2} 0 0" />
+            <geometry>
+                <cylinder radius="${rear_wheel_axis_radius}" length="${rear_wheel_axis_width}" />
+            </geometry>
+        </collision>
+    </link>
+
+    <xacro:wheel_link prefix="front_left"/>
+    <xacro:wheel_link prefix="front_right"/>
+    <xacro:wheel_link prefix="rear_left"/>
+    <xacro:wheel_link prefix="rear_right"/>
+    <xacro:steering_link prefix="front_left"/>
+    <xacro:steering_link prefix="front_right"/>
+
+    <!-- JOINTS -->
+    <joint name="footprint_to_chassis_joint" type="fixed">
+        <parent link="base_footprint"/>
+        <child link="chassis_link"/>
+        <origin xyz="0.0 0.0 ${wheel_radius + 0.028}" rpy="0.0 0.0 0.0"/>
+        <axis xyz="0.0 1.0 0.0"/>
+    </joint>
+
+    <joint name="chassis_to_front_suspension_joint" type="fixed">
+        <parent link="chassis_link" />
+        <child link="front_suspension_link" />
+        <origin xyz="${(chassis_length + front_suspension_length)/2} 0 ${chassis_height - front_suspension_height}" rpy="0.0 0.0 0.0" />
+        <axis xyz="0.0 1.0 0.0" />
+    </joint>
+
+    <joint name="chassis_to_rear_suspension_joint" type="fixed">
+        <parent link="chassis_link" />
+        <child link="rear_suspension_link" />
+        <origin
+            xyz="${-(chassis_length + rear_suspension_length)/2} 0 ${chassis_height - rear_suspension_height + 0.015}"
+            rpy="0.0 0.0 0.0" />
+        <axis xyz="0 1 0" />
+    </joint>
+
+    <joint name="front_suspension_axis_joint" type="fixed">
+        <parent link="front_suspension_link" />
+        <child link="front_axis_link" />
+        <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0" />
+        <axis xyz="0 1 0" />
+    </joint>
+
+    <joint name="rear_suspension_axis_joint" type="fixed">
+        <parent link="rear_suspension_link" />
+        <child link="rear_axis_link" />
+        <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0" />
+        <axis xyz="0 1 0" />
+    </joint>
+
+    <joint name="rear_left_wheel_joint" type="continuous">
+        <parent link="rear_axis_link" />
+        <child link="rear_left_wheel_link" />
+        <origin xyz="0 ${(rear_wheel_axis_width + wheel_width)/2} 0" rpy="0 0 0" />
+        <axis xyz="0 1 0" />
+        <limit effort="${max_effort}" velocity="${max_wheel_angular_vel}" />
+        <dynamics damping="0.1" friction="0.1"/>
+    </joint>
+
+    <joint name="rear_right_wheel_joint" type="continuous">
+        <parent link="rear_axis_link" />
+        <child link="rear_right_wheel_link" />
+        <origin xyz="0 ${-(rear_wheel_axis_width + wheel_width)/2} 0" rpy="0 0 0" />
+        <axis xyz="0 1 0" />
+        <limit effort="${max_effort}" velocity="${max_wheel_angular_vel}" />
+        <dynamics damping="0.1" friction="0.1"/>
+    </joint>
+
+    <joint name="front_right_steering_joint" type="revolute">
+        <parent link="front_axis_link" />
+        <child link="front_right_steering_link" />
+        <origin xyz="0 ${-(front_wheel_axis_width/2)} 0" rpy="0 0 0" />
+        <axis xyz="0 0 1" />
+        <limit lower="${-max_steering_angle}" upper="${max_steering_angle}" effort="${max_steering_effort}" velocity="${max_steering_angular_vel}" />
+        <dynamics damping="0.1" friction="0.1"/>
+    </joint>
+
+    <joint name="front_right_wheel_joint" type="continuous">
+        <parent link="front_right_steering_link" />
+        <child link="front_right_wheel_link" />
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <axis xyz="0 1 0" />
+        <limit effort="${max_effort}" velocity="${max_wheel_angular_vel}" />
+        <dynamics damping="0.1" friction="0.1"/>
+    </joint>
+
+    <joint name="front_left_steering_joint" type="revolute">
+        <parent link="front_axis_link" />
+        <child link="front_left_steering_link" />
+        <origin xyz="0 ${(front_wheel_axis_width/2)} 0" rpy="0 0 0" />
+        <axis xyz="0 0 1" />
+        <limit lower="${-max_steering_angle}" upper="${max_steering_angle}" effort="${max_steering_effort}" velocity="${max_steering_angular_vel}" />
+        <dynamics damping="0.1" friction="0.1"/>
+    </joint>
+
+    <joint name="front_left_wheel_joint" type="continuous">
+        <parent link="front_left_steering_link" />
+        <child link="front_left_wheel_link" />
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <axis xyz="0 1 0" />
+        <limit effort="${max_effort}" velocity="${max_wheel_angular_vel}" />
+        <dynamics damping="0.1" friction="0.1"/>
+    </joint>
+
+</robot>
