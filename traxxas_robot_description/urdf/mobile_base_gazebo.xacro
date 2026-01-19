@@ -38,8 +38,8 @@
         <wheel_base>${wheel_offset*2.0}</wheel_base>
         <wheel_separation>${wheel_separation}</wheel_separation>
         <wheel_radius>${wheel_radius}</wheel_radius>
-        <min_velocity>-${max_velocity}</min_velocity>
-        <max_velocity>${max_velocity}</max_velocity>
+        <min_velocity>-${max_vel}</min_velocity>
+        <max_velocity>${max_vel}</max_velocity>
         <min_acceleration>-30</min_acceleration>
         <max_acceleration>30</max_acceleration>
 
