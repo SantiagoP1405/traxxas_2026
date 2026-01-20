@@ -77,14 +77,14 @@
     <joint name="zed2_to_left_lens" type="fixed">
         <parent link="zed2_camera_link" />
         <child link="zed2_left_lens_link" />
-        <origin xyz="${zed_length/2} ${(zed_width/2) - lens_radius - lens_offset} 0" rpy="0 0 0" />
+        <origin xyz="${zed_length/2 + 0.001} ${(zed_width/2) - lens_radius - lens_offset} 0" rpy="0 0 0" />
         <axis xyz="0 1 0" />
     </joint>
 
     <joint name="zed2_to_right_lens" type="fixed">
         <parent link="zed2_camera_link" />
         <child link="zed2_right_lens_link" />
-        <origin xyz="${zed_length/2} -${(zed_width/2) - lens_radius - lens_offset} 0" rpy="0 0 0" />
+        <origin xyz="${zed_length/2 + 0.001} -${(zed_width/2) - lens_radius - lens_offset} 0" rpy="0 0 0" />
         <axis xyz="0 1 0" />
     </joint>
 
