@@ -28,6 +28,8 @@
   gz_type_name: "gz.msgs.Twist"
   direction: "ROS_TO_GZ"
 
+#   ZED2 Custom Camera Topics
+  # Right lens
 - ros_topic_name : "/zed2_custom/right/image_raw"
   gz_topic_name : "/zed2_custom/right/image_raw"
   ros_type_name : "sensor_msgs/msg/Image"
@@ -40,7 +42,7 @@
   gz_type_name   : "gz.msgs.CameraInfo"
   direction      : GZ_TO_ROS
 
-
+  # Left lens
 - ros_topic_name : "/zed2_custom/left/image_raw"
   gz_topic_name : "/zed2_custom/left/image_raw"
   ros_type_name : "sensor_msgs/msg/Image"
@@ -53,3 +55,15 @@
   gz_type_name   : "gz.msgs.CameraInfo"
   direction      : GZ_TO_ROS
 
+# Lane follower camera Topics
+- ros_topic_name : "/camera_lane_follower/image_raw"
+  gz_topic_name : "/camera_lane_follower/image_raw"
+  ros_type_name : "sensor_msgs/msg/Image"
+  gz_type_name : "gz.msgs.Image"
+  direction : GZ_TO_ROS
+
+- ros_topic_name : "/camera_lane_follower/camera_info"
+  gz_topic_name  : "/camera_lane_follower/camera_info"
+  ros_type_name  : "sensor_msgs/msg/CameraInfo"
+  gz_type_name   : "gz.msgs.CameraInfo"
+  direction      : GZ_TO_ROS
