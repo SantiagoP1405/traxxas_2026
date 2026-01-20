@@ -127,7 +127,7 @@ def angle_to_pwm(delta_deg, left_curv, right_curv):
     pwm_min = 1669
     pwm_center = 2642
     pwm_max = 3276
-    max_steer_deg = 20.0
+    max_steer_deg = 30.0
     
     # Determinar dirección basado en cuál curvatura es menor
     if right_curv < left_curv:
@@ -162,9 +162,9 @@ class LaneDetectorNode(Node):
         )
         self.direction_pwm_pub = self.create_publisher(String, 'direction_servo', qos_profile)
         self.throttle_pwm_pub = self.create_publisher(String, 'throttle_motor', qos_profile)
-        #pkg_path = get_package_share_directory('traxxas_lane_detection')
-        #video_path = os.path.join(pkg_path, 'video_pista.mp4')
-        self.cap = cv2.VideoCapture(0)
+        video_path = "/home/traxxas/Workspaces/traxxas_pruebas/video_derecha.mp4"
+        self.cap = cv2.VideoCapture(video_path)
+        #self.cap = cv2.VideoCapture(0)
         width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         self.get_logger().info(f"Resolución cámara: {width} x {height}")
@@ -214,8 +214,8 @@ class LaneDetectorNode(Node):
             left_curve, right_curve = measure_curvature(ploty, left_fit, right_fit)
             lane_center = fuse_curve_rads(left_curve, right_curve)
             delta_deg = steering_from_curvature(lane_center)
-            self.get_logger().info("Angulo de dirección: {:.2f} grados".format(delta_deg))
-            pwm = angle_to_pwm(delta_deg, left_curve, right_curve)       
+            pwm = angle_to_pwm(delta_deg, left_curve, right_curve)
+            self.get_logger().info("Angulo de dirección: {:.2f} grados".format(delta_deg) + "PWM: {}".format(pwm))       
 
         if left_fit is None or right_fit is None:
             cv2.putText(sliding_img, "Carril no detectado", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
