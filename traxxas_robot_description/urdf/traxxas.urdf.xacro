@@ -4,9 +4,9 @@
     <xacro:include filename="$(find traxxas_robot_description)/urdf/mobile_base.xacro" />
     <xacro:include filename="$(find traxxas_robot_description)/urdf/mobile_base_gazebo.xacro" />
 
-    <!-- The original design does not include any camera nor lidar. 
+    <!-- The original design does not include any camera nor LiDAR. 
     To edit original design, comment the following lines.  -->
     <xacro:include filename="$(find traxxas_robot_description)/urdf/zed2.xacro" />
-    <xacro:include filename="$(find traxxas_robot_description)/urdf/camera_lane.xacro" />
+    <!-- <xacro:include filename="$(find traxxas_robot_description)/urdf/camera_lane.xacro" /> -->
     <xacro:include filename="$(find traxxas_robot_description)/urdf/lidar.xacro" />
 </robot>

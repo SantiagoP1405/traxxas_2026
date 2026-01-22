@@ -6,8 +6,12 @@
     <xacro:property name="zed_height" value="0.03" />
     <xacro:property name="lens_radius" value="0.0095" />
     <xacro:property name="lens_offset" value="0.017" />
-    <xacro:property name="zed_length_position" value="0.053" />
+    <xacro:property name="zed_length_position" value="0.05353" />
     <xacro:property name="zed_mass" value="0.124" />
+    <!-- Stand properties -->
+    <xacro:property name="stand_length" value="${zed_length}" />
+    <xacro:property name="stand_width" value="0.072" />
+    <xacro:property name="stand_height" value="0.0214" />
 
     <!-- Functions -->
     <xacro:macro name="lens" params="prefix">
@@ -30,6 +34,23 @@
     </xacro:macro>
 
     <!-- Links -->
+    <link name="stand_link">
+        <xacro:box_inertia m="0.3" l="${stand_length}" w="${stand_width}" h="${stand_height}" o_xyz="0.0 0.0 ${stand_height/2}" o_rpy="0.0 0.0 0.0" />
+        <visual>
+            <origin xyz="0 0 0" rpy="0 0 0" />
+            <geometry>
+                <box size="${stand_length} ${stand_width} ${stand_height}" />
+            </geometry>
+            <material name="white" />
+        </visual>
+        <collision>
+            <origin xyz="0 0 0" rpy="0 0 0" />
+            <geometry>
+                <box size="${stand_length} ${stand_width} ${stand_height}" />
+            </geometry>
+        </collision>
+    </link>
+
     <link name="zed2_camera_link">
         <xacro:box_inertia l="${zed_length}" w="${zed_width}" h="${zed_height}" 
             m="${zed_mass}" o_xyz="0.0 0.0 0.0" o_rpy="0.0 0.0 0.0"/>
@@ -61,16 +82,31 @@
         <child link="zed2_left_optical"/>
         <origin xyz="0 0 0" rpy="${-pi/2} 0 ${-pi/2}"/>
     </joint>
+
     <joint name="zed2_right_to_optical" type="fixed">
         <parent link="zed2_right_lens_link"/>
         <child link="zed2_right_optical"/>
         <origin xyz="0 0 0" rpy="${-pi/2} 0 ${-pi/2}"/>
     </joint>
 
-    <joint name="chassis_to_zed2_joint" type="fixed">
+    <!-- <joint name="chassis_to_zed2_joint" type="fixed">
         <parent link="chassis_link" />
         <child link="zed2_camera_link" />
         <origin xyz="${((chassis_length + zed_length)/2) - zed_length_position} 0 ${chassis_height + zed_height/2}" rpy="0 0 0" />
+        <axis xyz="0 1 0" />
+    </joint> -->
+
+    <joint name="chassis_to_stand" type="fixed">
+        <parent link="chassis_link" />
+        <child link="stand_link" />
+        <origin xyz="${(chassis_length/2) - (stand_length/2) - zed_length_position} 0 ${chassis_height + stand_height/2}" rpy="0 0 0" />
+        <axis xyz="1 0 0" />
+    </joint>
+
+    <joint name="stand_to_zed2" type="fixed">
+        <parent link="stand_link" />
+        <child link="zed2_camera_link" />
+        <origin xyz="0 0 ${stand_height/2 + zed_height/2}" rpy="0 0 0" />
         <axis xyz="0 1 0" />
     </joint>
 
