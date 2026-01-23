@@ -1,0 +1,49 @@
+<?xml version="1.0" ?>
+<sdf version="1.8">
+  <world name="floorplan_world">
+    <gravity>0 0 -9.8</gravity>
+    <scene>
+      <ambient>0.4 0.4 0.4 1</ambient>
+      <background>0.2 0.2 0.2 1</background>
+    </scene>
+    
+    <!-- Plano de suelo con textura de la imagen -->
+    <model name="floorplan_ground">
+      <static>true</static>
+      <pose>0.0 0.0 0.0 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>12.0 7.99413059427733</size>
+            </plane>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>12.0 7.99413059427733</size>
+            </plane>
+          </geometry>
+          <material>
+            <diffuse>1 1 1 1</diffuse>
+            <ambient>1 1 1 1</ambient>
+            <specular>0 0 0 1</specular>
+            <emissive>1 1 1 1</emissive>
+            <pbr>
+              <metal>
+                <albedo_map>/home/santiago_gomez/Workspaces/traxxas_ws/src/traxxas_robot_simulation/tools/track_img.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+                <emissive_map>/home/santiago_gomez/Workspaces/traxxas_ws/src/traxxas_robot_simulation/tools/track_img.png</emissive_map>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+    
+  </world>
+</sdf>

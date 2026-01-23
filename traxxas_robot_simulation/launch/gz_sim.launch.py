@@ -23,6 +23,11 @@ def generate_launch_description():
     # Get the Gazebo bridge config file path
     gz_bridge_config_path = os.path.join(get_package_share_directory('traxxas_robot_simulation'), 'config', 'gz_bridge.yaml')
 
+    #Get the SDF world file path
+    gz_world_path = os.path.join(get_package_share_path('traxxas_robot_simulation'),
+        'worlds',
+        'track_world.sdf')
+
     # Node for robot state publisher
     robot_description = ParameterValue(Command(['xacro ', urdf_path]), value_type=str)
     robot_state_publisher_node = Node(
@@ -36,14 +41,17 @@ def generate_launch_description():
         PythonLaunchDescriptionSource([
             gz_launch_path,
             "/ign_gazebo.launch.py"
-        ]), launch_arguments={'gz_args': '-r empty.sdf'}.items()
+        ]), launch_arguments={'gz_args': f'{gz_world_path} -r'}.items()
     )
 
     # Node for robot generation in Gazebo
     spawn_robot_node = Node(
         package='ros_ign_gazebo',
         executable='create',
-        arguments=['-topic', '/robot_description']
+        arguments=['-topic', '/robot_description',
+                   '-x', '-0.739400',
+                   '-y', '3.035775',
+                   '-Y', '3.14']  # Yaw in radians
     )
 
     # Node for rviz2 launch
