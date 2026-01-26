@@ -4,13 +4,12 @@ import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
 from ament_index_python.packages import get_package_share_directory
-import os
 import math
 import numpy as np
 import cv2
+import pyzed.sl as sl
 
 
-# warp para TOP VIEW
 def warp(img, src, dst):
     M = cv2.getPerspectiveTransform(src.astype(np.float32), dst.astype(np.float32))
     return cv2.warpPerspective(img, M, (img.shape[1], img.shape[0]))
@@ -93,8 +92,8 @@ def sliding_window(binary_warped):
 
 
 def measure_curvature(ploty, left_fit, right_fit):
-    ym_per_pix = 0.69/480
-    xm_per_pix = 0.25/640
+    ym_per_pix = 0.38/720
+    xm_per_pix = 0.40/1280
     
     y_eval = np.max(ploty)
     
@@ -109,16 +108,15 @@ def measure_curvature(ploty, left_fit, right_fit):
     
     return left_curverad, right_curverad
 
-def fuse_curve_rads(radius_left, radius_right):
-    k_left=1.0/radius_left  
-    k_right=1.0/radius_right
-    k_center = 0.5 * (k_left + k_right)
-    r_center = 1.0/k_center
-    return r_center
 
-def steering_from_curvature(R):
-    #separacion entre ejes
+def steering_from_curvature(left_curvature, right_curvature):
     L=0.28
+    if right_curvature < left_curvature:
+        R=right_curvature
+    elif left_curvature < right_curvature:
+        R=left_curvature
+    else:
+        R=right_curvature
     delta_rad=math.atan(L/R)
     delta_deg=math.degrees(delta_rad)
     return delta_deg
@@ -129,28 +127,68 @@ def angle_to_pwm(delta_deg, left_curv, right_curv):
     pwm_max = 3276
     max_steer_deg = 30.0
     
-    # Determinar dirección basado en cuál curvatura es menor
     if right_curv < left_curv:
-        # Radio derecho pequeño → girar a la IZQUIERDA (PWM menor)
-        delta_deg = -abs(delta_deg)  # Asegurar que sea negativo
+        delta_deg = -abs(delta_deg)
     elif left_curv < right_curv:
-        # Radio izquierdo pequeño  → girar a la DERECHA (PWM mayor)
-        delta_deg = abs(delta_deg)   # Asegurar que sea positivo
+        delta_deg = abs(delta_deg)
     
-    # Limitar el ángulo
     delta_deg = max(-max_steer_deg, min(max_steer_deg, delta_deg))
     
     norm = delta_deg / max_steer_deg
 
     if norm >= 0:
-        # Girar a la derecha
         pwm = pwm_center + norm * (pwm_max - pwm_center)
     else:
-        # Girar a la izquierda
         pwm = pwm_center + norm * (pwm_center - pwm_min)
     
     return int(pwm)
 
+def fill_holes(mask):
+    h, w = mask.shape[:2]
+    inv = cv2.bitwise_not(mask)
+    num_labels, labels = cv2.connectedComponents(inv, connectivity=4)
+
+    border = np.zeros_like(labels, dtype=bool)
+    border[0, :] = True
+    border[-1, :] = True
+    border[:, 0] = True
+    border[:, -1] = True
+    border_labels = np.unique(labels[border])
+
+    # fondo = unión de todas las etiquetas de borde
+    fondo_mask = np.isin(labels, border_labels)
+
+    # 4) Huecos = todo lo que NO es fondo en la imagen invertida
+    holes = np.logical_not(fondo_mask).astype(np.uint8) * 255
+
+    # 5) Añadir huecos al objeto original
+    out = cv2.bitwise_or(mask, holes)
+    
+    return out
+
+
+def iniciar_zed(ruta_svo=None):
+    zed = sl.Camera()
+    init_params = sl.InitParameters()
+
+    init_params.depth_mode = sl.DEPTH_MODE.PERFORMANCE
+    init_params.coordinate_units = sl.UNIT.METER
+
+    if ruta_svo:
+        print(f"Modo: Leyendo archivo grabado -> {ruta_svo}")
+        init_params.set_from_svo_file(ruta_svo)
+        init_params.svo_real_time_mode = False
+    else:
+        print("Modo: Cámara ZED 2 en vivo")
+        init_params.camera_resolution = sl.RESOLUTION.HD720
+        init_params.camera_fps = 30
+
+    status = zed.open(init_params)
+    if status != sl.ERROR_CODE.SUCCESS:
+        print(f"Error al abrir ZED: {status}")
+        return None
+
+    return zed
 
 class LaneDetectorNode(Node):
     def __init__(self):
@@ -161,94 +199,101 @@ class LaneDetectorNode(Node):
             depth=10
         )
         self.direction_pwm_pub = self.create_publisher(String, 'direction_servo', qos_profile)
-        self.throttle_pwm_pub = self.create_publisher(String, 'throttle_motor', qos_profile)
-        video_path = "/home/traxxas/Workspaces/traxxas_pruebas/video_derecha.mp4"
-        self.cap = cv2.VideoCapture(video_path)
-        #self.cap = cv2.VideoCapture(0)
-        width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        self.get_logger().info(f"Resolución cámara: {width} x {height}")
-        #self.cap = cv2.VideoCapture(video_path)
+        self.throttle_pwm_pub  = self.create_publisher(String, 'throttle_motor', qos_profile)
 
-        # if not self.cap.isOpened():
-        #     self.get_logger().error(f"No se pudo abrir el video: {video_path}")
-        # else:
-        #     self.get_logger().info(f"Video cargado: {video_path}")
+        ruta_svo = "/home/traxxas/Documents/ZED/video_1.svo2"
+        self.zed = iniciar_zed(ruta_svo)
+
+        if self.zed is None:
+            self.get_logger().error("No se pudo inicializar la ZED con el SVO")
+            raise RuntimeError("Error inicializando ZED")
+
+        self.zed_image = sl.Mat()
+        self.runtime_params = sl.RuntimeParameters()
+
+        cam_info = self.zed.get_camera_information()
 
         self.timer = self.create_timer(0.1, self.timer_callback)
-        #metodo que apaga los servos al cerrar el nodo
-        #self.add_on_shutdown(self.send_safe_stop)
-
 
     def timer_callback(self):
-        ret, img_bgr = self.cap.read()
-        if not ret:
-            self.get_logger().warn("Video finished")
+        grab_state = self.zed.grab(self.runtime_params)
+        if grab_state == sl.ERROR_CODE.END_OF_SVOFILE_REACHED:
+            self.get_logger().warn("Fin del SVO alcanzado, reiniciando al inicio")
+            self.zed.set_svo_position(0)
+            return
+        elif grab_state != sl.ERROR_CODE.SUCCESS:
+            self.get_logger().warn(f"Error al leer frame: {grab_state}")
             return
 
-        img_grey = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY) 
-        img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
-        img_blur = cv2.GaussianBlur(img_grey, (3, 3), 0, 0)
-        img_canny = cv2.Canny(img_blur, 40, 120) 
+        self.zed.retrieve_image(self.zed_image, sl.VIEW.LEFT)
+        img_bgr = self.zed_image.get_data()[:, :, :3]
 
-        vertices = np.array([[(0,200), (155, 200), (163, 480), (0, 448)]], dtype=np.int32)
-        vertices2 = np.array([[(238,196), (340, 196), (443, 224), (570, 297), (640,361), (640, 480),(480,480), (442,283), (335, 226)]], dtype=np.int32)  
+        h, w = img_bgr.shape[:2]
+        vertices = np.array([[(int(0.24 * w),int(0.583 * h)), (int(0.672 * w),int(0.583 * h)), (int(0.86 * w),int(0.833 * h)), (int(0.15 * w),int(0.833 * h))]], dtype=np.int32)
+
+        img_roi_mask = np.zeros((h, w), dtype=np.uint8)
+        cv2.fillPoly(img_roi_mask, vertices, 255)
+        img_cropped = cv2.bitwise_and(img_bgr, img_bgr, mask=img_roi_mask)
+
+        img_hsv = cv2.cvtColor(img_cropped, cv2.COLOR_BGR2HSV)
+        lower_black = np.array([0, 0, 0])
+        upper_black = np.array([180, 80, 60])
+        mask_black = cv2.inRange(img_hsv, lower_black, upper_black)
+        kernel = np.ones((5,5), np.uint8)
+        mask_black = cv2.morphologyEx(mask_black, cv2.MORPH_CLOSE, kernel)
+        mask_black = cv2.morphologyEx(mask_black, cv2.MORPH_OPEN, kernel)
+
+        mask_black = fill_holes(mask_black)
+
+        img_grey = cv2.cvtColor(img_cropped, cv2.COLOR_BGR2GRAY)
+        img_blur = cv2.GaussianBlur(img_grey, (3, 3), 0, 0)
+        masked_gray = cv2.bitwise_and(img_blur, img_blur, mask=mask_black)
+        img_canny = cv2.Canny(masked_gray, 40, 120)
 
         dst1 = np.array([[75, 0], [250, 0], [250, 448], [75, 448]], dtype=np.int32)
 
-        img_roi = np.zeros_like(img_grey)   
-        cv2.fillPoly(img_roi, vertices, 255)
-        cv2.fillPoly(img_roi, vertices2, 255)
-        img_mask = cv2.bitwise_and(img_canny, img_roi)
-        warped1 = warp(img_mask, vertices[0], dst1)
+        warped1 = warp(img_canny, vertices[0], dst1)
 
         sliding_img, left_fit, right_fit, ploty = sliding_window(warped1)
         
         if left_fit is None or right_fit is None:
-            pwm = 2642  # centro
+            pwm = 2642
             left_curve = None
             right_curve = None
             self.get_logger().warn("No se detectaron carriles → PWM centro")
-
         else:
             left_curve, right_curve = measure_curvature(ploty, left_fit, right_fit)
-            lane_center = fuse_curve_rads(left_curve, right_curve)
-            delta_deg = steering_from_curvature(lane_center)
+            delta_deg = steering_from_curvature(left_curve, right_curve)
             pwm = angle_to_pwm(delta_deg, left_curve, right_curve)
-            self.get_logger().info("Angulo de dirección: {:.2f} grados".format(delta_deg) + "PWM: {}".format(pwm))       
+            self.get_logger().info("Ángulo dirección: {:.2f}°  PWM: {}".format(delta_deg, pwm))
 
         if left_fit is None or right_fit is None:
-            cv2.putText(sliding_img, "Carril no detectado", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+            cv2.putText(sliding_img, "Carril no detectado", (10, 30),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
         else:
-            cv2.putText(sliding_img, f"Left: {int(left_curve*100)}cm Right: {int(right_curve*100)}cm", 
-                        (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-            
+            cv2.putText(sliding_img,
+                        f"Left: {int(left_curve*100)}cm Right: {int(right_curve*100)}cm",
+                        (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
+                        (255, 255, 255), 2)
 
-        # === PUBLICAR ===
-        # left_msg = Float32()
-        # right_msg = Float32()
-        # left_msg.data = float(left_curve)
-        # right_msg.data = float(right_curve)
-        # self.left_pub.publish(left_msg)
-        # self.right_pub.publish(right_msg)
         pwm_msg = String()
         pwm_msg.data = str(pwm)
         self.direction_pwm_pub.publish(pwm_msg)
-        
-        #Publicador para throttle fijo
-        throttle_pwm = 2700  # Valor fijo para avanzar
+
+        throttle_pwm = 2700
         throttle_msg = String()
         throttle_msg.data = str(throttle_pwm)
         self.throttle_pwm_pub.publish(throttle_msg)
 
-        # === VENTANAS ===
         cv2.imshow("Original", img_bgr)
-        cv2.imshow("ROI Mask", img_roi)
-        cv2.imshow("ROI Applied", img_mask)
+        cv2.imshow("Cropped ROI", img_cropped)
+        cv2.imshow("Black Mask", mask_black)
+        cv2.imshow("Masked Gray", masked_gray)
+        cv2.imshow("Canny Filtered", img_canny)
         cv2.imshow("Warped", warped1)
         cv2.imshow("Sliding Window", sliding_img)
-
         cv2.waitKey(1)
+
 
 def main(args=None):
     rclpy.init(args=args)
