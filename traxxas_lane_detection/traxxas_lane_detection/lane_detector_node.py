@@ -21,14 +21,14 @@ def sliding_window(binary_warped):
     leftx_base = np.argmax(histogram[:midpoint])
     rightx_base = np.argmax(histogram[midpoint:]) + midpoint
     
-    nwindows = 9
+    nwindows = 12
     window_height = np.int32(binary_warped.shape[0]/nwindows)
     nonzero = binary_warped.nonzero()
     nonzeroy = np.array(nonzero[0])
     nonzerox = np.array(nonzero[1])
     leftx_current = leftx_base
     rightx_current = rightx_base
-    margin = 100
+    margin = 80
     minpix = 50
     left_lane_inds = []
     right_lane_inds = []
@@ -92,7 +92,7 @@ def sliding_window(binary_warped):
 
 
 def measure_curvature(ploty, left_fit, right_fit):
-    ym_per_pix = 0.38/720
+    ym_per_pix = 0.60/720
     xm_per_pix = 0.40/1280
     
     y_eval = np.max(ploty)
@@ -107,7 +107,6 @@ def measure_curvature(ploty, left_fit, right_fit):
     right_curverad = ((1 + (2*right_fit_cr[0]*y_eval*ym_per_pix + right_fit_cr[1])**2)**1.5) / np.absolute(2*right_fit_cr[0])
     
     return left_curverad, right_curverad
-
 
 def steering_from_curvature(left_curvature, right_curvature):
     L=0.28
@@ -143,30 +142,6 @@ def angle_to_pwm(delta_deg, left_curv, right_curv):
     
     return int(pwm)
 
-def fill_holes(mask):
-    h, w = mask.shape[:2]
-    inv = cv2.bitwise_not(mask)
-    num_labels, labels = cv2.connectedComponents(inv, connectivity=4)
-
-    border = np.zeros_like(labels, dtype=bool)
-    border[0, :] = True
-    border[-1, :] = True
-    border[:, 0] = True
-    border[:, -1] = True
-    border_labels = np.unique(labels[border])
-
-    # fondo = unión de todas las etiquetas de borde
-    fondo_mask = np.isin(labels, border_labels)
-
-    # 4) Huecos = todo lo que NO es fondo en la imagen invertida
-    holes = np.logical_not(fondo_mask).astype(np.uint8) * 255
-
-    # 5) Añadir huecos al objeto original
-    out = cv2.bitwise_or(mask, holes)
-    
-    return out
-
-
 def iniciar_zed(ruta_svo=None):
     zed = sl.Camera()
     init_params = sl.InitParameters()
@@ -201,8 +176,9 @@ class LaneDetectorNode(Node):
         self.direction_pwm_pub = self.create_publisher(String, 'direction_servo', qos_profile)
         self.throttle_pwm_pub  = self.create_publisher(String, 'throttle_motor', qos_profile)
 
-        ruta_svo = "/home/traxxas/Documents/ZED/video_1.svo2"
+        ruta_svo = "/home/traxxas/Documents/ZED/vid_2.svo2"
         self.zed = iniciar_zed(ruta_svo)
+        #self.zed = iniciar_zed()
 
         if self.zed is None:
             self.get_logger().error("No se pudo inicializar la ZED con el SVO")
@@ -229,32 +205,54 @@ class LaneDetectorNode(Node):
         img_bgr = self.zed_image.get_data()[:, :, :3]
 
         h, w = img_bgr.shape[:2]
-        vertices = np.array([[(int(0.24 * w),int(0.583 * h)), (int(0.672 * w),int(0.583 * h)), (int(0.86 * w),int(0.833 * h)), (int(0.15 * w),int(0.833 * h))]], dtype=np.int32)
 
-        img_roi_mask = np.zeros((h, w), dtype=np.uint8)
-        cv2.fillPoly(img_roi_mask, vertices, 255)
-        img_cropped = cv2.bitwise_and(img_bgr, img_bgr, mask=img_roi_mask)
-
-        img_hsv = cv2.cvtColor(img_cropped, cv2.COLOR_BGR2HSV)
+        # 1) Filtrado por color negro en TODA la imagen
+        img_hsv = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2HSV)
         lower_black = np.array([0, 0, 0])
         upper_black = np.array([180, 80, 60])
         mask_black = cv2.inRange(img_hsv, lower_black, upper_black)
-        kernel = np.ones((5,5), np.uint8)
-        mask_black = cv2.morphologyEx(mask_black, cv2.MORPH_CLOSE, kernel)
-        mask_black = cv2.morphologyEx(mask_black, cv2.MORPH_OPEN, kernel)
 
-        mask_black = fill_holes(mask_black)
-
-        img_grey = cv2.cvtColor(img_cropped, cv2.COLOR_BGR2GRAY)
+        kernel = np.ones((30,30), np.uint8)
+        mask_black = cv2.morphologyEx(mask_black, cv2.MORPH_CLOSE, kernel, iterations = 15)
+        #mask_black = cv2.morphologyEx(mask_black, cv2.MORPH_OPEN, kernel, iterations = 1)
+        
+        # 2) Gris + blur en TODA la imagen
+        img_grey = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
         img_blur = cv2.GaussianBlur(img_grey, (3, 3), 0, 0)
+
+        # 3) Aplicar máscara negra sobre el gris
         masked_gray = cv2.bitwise_and(img_blur, img_blur, mask=mask_black)
+
+        # 4) Canny sobre la imagen ya filtrada por color
         img_canny = cv2.Canny(masked_gray, 40, 120)
+        # 5) Definir ROI SOLO PARA CANNY (no para la imagen a color)
+        vertices = np.array([[
+            (int(0.24 * w), int(0.583 * h)),
+            (int(0.80 * w), int(0.583 * h)),
+            (int(0.86 * w), int(0.833 * h)),
+            (int(0.15 * w), int(0.833 * h))
+        ]], dtype=np.int32)
 
-        dst1 = np.array([[75, 0], [250, 0], [250, 448], [75, 448]], dtype=np.int32)
+        img_roi_mask = np.zeros_like(img_canny, dtype=np.uint8)
+        cv2.fillPoly(img_roi_mask, vertices, 255)
 
-        warped1 = warp(img_canny, vertices[0], dst1)
+        # 6) Mantener solo bordes dentro del trapecio
+        img_canny_roi = cv2.bitwise_and(img_canny, img_canny, mask=img_roi_mask)
 
+        # 7) Warp usando el Canny ya enmascarado
+        dst1 = np.array([
+            [int(0.35 * w), 0],
+            [int(0.65 * w), 0],
+            [int(0.65 * w), h],
+            [int(0.35 * w), h]
+        ], dtype=np.int32)
+
+        warped1 = warp(img_canny_roi, vertices[0], dst1)
+        # 8) Sliding window
         sliding_img, left_fit, right_fit, ploty = sliding_window(warped1)
+
+        img_roi_mask = np.zeros_like(img_canny, dtype=np.uint8)
+        cv2.fillPoly(img_roi_mask, vertices, 255)
         
         if left_fit is None or right_fit is None:
             pwm = 2642
@@ -286,11 +284,11 @@ class LaneDetectorNode(Node):
         self.throttle_pwm_pub.publish(throttle_msg)
 
         cv2.imshow("Original", img_bgr)
-        cv2.imshow("Cropped ROI", img_cropped)
         cv2.imshow("Black Mask", mask_black)
         cv2.imshow("Masked Gray", masked_gray)
         cv2.imshow("Canny Filtered", img_canny)
         cv2.imshow("Warped", warped1)
+        cv2.imshow("roi", img_roi_mask)
         cv2.imshow("Sliding Window", sliding_img)
         cv2.waitKey(1)
 
