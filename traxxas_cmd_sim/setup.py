@@ -24,6 +24,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
+            'cmd_sim = traxxas_cmd_sim.cmd_sim:main'
         ],
     },
 )
