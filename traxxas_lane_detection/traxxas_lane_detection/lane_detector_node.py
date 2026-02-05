@@ -40,7 +40,7 @@ def filters(img_bgr):
 
 
 def sliding_window(binary_warped):
-    histogram = np.sum(binary_warped[binary_warped.shape[0]//2:,:], axis=0)
+    histogram = np.sum(binary_warped, axis=0)
     base = np.argmax(histogram)
     
     nwindows = 12
@@ -192,8 +192,8 @@ class LaneDetectorNode(Node):
         self.throttle_pwm_pub  = self.create_publisher(String, 'throttle_motor', qos_profile)
 
         ruta_svo = "/home/traxxas/Documents/ZED/vid_2.svo2"
-        self.zed = iniciar_zed(ruta_svo)
-        #self.zed = iniciar_zed()
+        #self.zed = iniciar_zed(ruta_svo)
+        self.zed = iniciar_zed()
 
         if self.zed is None:
             self.get_logger().error("No se pudo inicializar la ZED con el SVO")
@@ -230,19 +230,19 @@ class LaneDetectorNode(Node):
         img_canny_right = filters(img_bgr_right)
 
         h, w = img_canny_left.shape[:2]
-        # 5) Definir ROI SOLO PARA CANNY (no para la imagen a color)
+        # 5) Definir ROI SOLO PARA CANNY 
         vertices_left = np.array([[
             (int(0.24 * w), int(0.514 * h)),
             (int(0.531 * w), int(0.514 * h)),
-            (int(0.531 * w), h),
-            (int(0.195 * w), h)
+            (int(0.531 * w), int(0.83 * h)),
+            (int(0.195 * w), int(0.83* h) )
         ]], dtype=np.int32)
 
         vertices_right = np.array([[
             (int(0.469 * w), int(0.583 * h)),
             (int(0.86 * w), int(0.583 * h)),
-            (int(0.86 * w), h),
-            (int(0.469 * w), h)
+            (int(0.86 * w), int(0.83 * h)),
+            (int(0.469 * w), int(0.83 * h))
         ]], dtype=np.int32)
 
         #Imagen izquierda
@@ -322,16 +322,21 @@ class LaneDetectorNode(Node):
         self.throttle_pwm_pub.publish(throttle_msg)
 
         end_time = time.time()
+        
+        
+        #cv2.imshow("Original left", img_bgr_left)
+        #cv2.imshow("Original right", img_bgr_right)
+        #cv2.imshow("Sliding Window Left", sliding_img_left)
+        #cv2.imshow("Sliding Window Right", sliding_img_right)  
+        #cv2.imshow("Warped left", warped_left)
+        #cv2.imshow("Warped right", warped_right)
+        #cv2.imshow("canny", img_canny_left )
+        #cv2.imshow("canny", img_canny_roi_left )
+        #cv2.imshow("canny right", img_canny_roi_right )
+        cv2.waitKey(1)
         elapsed_time = end_time - start_time
         self.get_logger().info(f"Tiempo de procesamiento: {elapsed_time*1000:.2f} ms") 
-
-        # cv2.imshow("Original left", img_bgr_left)
-        # cv2.imshow("Original right", img_bgr_right)
-        # cv2.imshow("Sliding Window Left", sliding_img_left)
-        # cv2.imshow("Sliding Window Right", sliding_img_right)
-        # cv2.imshow("Warped left", warped_left)
-        # cv2.imshow("Warped right", warped_right)
-        # cv2.waitKey(1)
+        
 
 
 def main(args=None):
