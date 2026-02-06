@@ -38,6 +38,45 @@ def filters(img_bgr):
         
         return img_canny
 
+# Filtro optimizado con OpenCV Cuda
+def filters_cuda(img_bgr):
+    stream = cv2.cuda_Stream()
+    # Sube a GPU
+    gpu_img = cv2.cuda_GpuMat()
+    gpu_img.upload (img_bgr,stream)
+    # BGR a Gray
+    gpu_gray= cv2.cuda.cvtColor(gpu_img, cv2.COLOR_BGR2GRAY)
+
+    # Clahe = mejora el contraste
+    clahe = cv2.cuda.createCLAHE( clipLimit = 3.0 , tileGridSize = (8,8))
+    gpu_gray = clahe.apply(gpu_gray, stream)
+
+    # Blur
+    gauss1 = cv2.cuda.createGaussianFilter(cv2.CV_8UC1, cv2.CV_8UC1 , (5,5), 1)
+    gpu_blur = gauss1.apply(gpu_gray)
+    # Threshold = Pasar a binario
+    _ , gpu_white = cv2.cuda.threshold(gpu_blur,200,255,cv2.THRESH_BINARY)
+
+    # después de tener gpu_white
+    gpu_gray_masked = cv2.cuda.bitwise_and(gpu_gray, gpu_gray, mask=gpu_white)
+
+    # blur sobre el masked
+    gpu_blur = gauss1.apply(gpu_gray_masked)
+
+    # Bordes 
+    canny = cv2.cuda.createCannyEdgeDetector(30, 90)
+    gpu_edges = canny.detect(gpu_blur)  
+
+    # Unir gpu_edges con gpu_white
+    gpu_lane = cv2.cuda.bitwise_and(gpu_white,gpu_edges)
+
+    img_canny = gpu_lane.download()
+    #img_gray = gpu_gray.download()
+    #img_edges = gpu_edges.download()
+    img_white = gpu_white.download()
+    
+    return img_canny  , img_white #, img_gray , img_edges , img_white
+
 
 def sliding_window(binary_warped):
     histogram = np.sum(binary_warped, axis=0)
@@ -49,7 +88,7 @@ def sliding_window(binary_warped):
     nonzeroy = np.array(nonzero[0])
     nonzerox = np.array(nonzero[1])
     current_x= base
-    margin = 80
+    margin = 100
     minpix = 50
     lane_inds = []
     out_img = np.dstack((binary_warped, binary_warped, binary_warped))*255
@@ -114,9 +153,9 @@ def measure_curvature(ploty, fit):
 def steering_from_curvature(left_curvature, right_curvature):
     L=0.28
 
-    if right_curvature is not None and left_curvature is not None and right_curvature < left_curvature:
+    if right_curvature is not None and left_curvature is not None and right_curvature > left_curvature:
         R=right_curvature
-    elif right_curvature is not None and left_curvature is not None and left_curvature < right_curvature:
+    elif right_curvature is not None and left_curvature is not None and left_curvature > right_curvature:
         R=left_curvature
     elif right_curvature is None and left_curvature is not None:
         R=left_curvature
@@ -135,9 +174,9 @@ def angle_to_pwm(delta_deg, left_curv, right_curv):
     pwm_max = 3276
     max_steer_deg = 30.0
     
-    if right_curv is not None and left_curv is not None and right_curv < left_curv:
+    if right_curv is not None and left_curv is not None and right_curv > left_curv:
         delta_deg = -abs(delta_deg)
-    elif right_curv is not None and left_curv is not None and left_curv < right_curv:
+    elif right_curv is not None and left_curv is not None and left_curv > right_curv:
         delta_deg = abs(delta_deg)
     elif right_curv is None and left_curv is not None:
         delta_deg = -abs(delta_deg)
@@ -191,7 +230,7 @@ class LaneDetectorNode(Node):
         self.direction_pwm_pub = self.create_publisher(String, 'direction_servo', qos_profile)
         self.throttle_pwm_pub  = self.create_publisher(String, 'throttle_motor', qos_profile)
 
-        ruta_svo = "/home/traxxas/Documents/ZED/vid_2.svo2"
+        ruta_svo = "/home/traxxas/Documents/ZED/video_prueba.svo2"
         #self.zed = iniciar_zed(ruta_svo)
         self.zed = iniciar_zed()
 
@@ -226,8 +265,10 @@ class LaneDetectorNode(Node):
         img_bgr_left = self.zed_image_left.get_data()[:, :, :3]
         img_bgr_right = self.zed_image_right.get_data()[:, :, :3]
 
-        img_canny_left = filters(img_bgr_left)
-        img_canny_right = filters(img_bgr_right)
+        #img_canny_left, img_gray_left , img_edges_left ,img_white_left = filters_cuda(img_bgr_left)
+        #img_canny_right, img_gray_right , img_edges_right ,  img_white_right = filters_cuda(img_bgr_right)
+        img_canny_left , img_white_l= filters_cuda(img_bgr_left)
+        img_canny_right, img_white_r  = filters_cuda(img_bgr_right)
 
         h, w = img_canny_left.shape[:2]
         # 5) Definir ROI SOLO PARA CANNY 
@@ -328,11 +369,13 @@ class LaneDetectorNode(Node):
         #cv2.imshow("Original right", img_bgr_right)
         #cv2.imshow("Sliding Window Left", sliding_img_left)
         #cv2.imshow("Sliding Window Right", sliding_img_right)  
-        #cv2.imshow("Warped left", warped_left)
-        #cv2.imshow("Warped right", warped_right)
+        cv2.imshow("Warped left", warped_left)
+        cv2.imshow("Warped right", warped_right)
         #cv2.imshow("canny", img_canny_left )
-        #cv2.imshow("canny", img_canny_roi_left )
-        #cv2.imshow("canny right", img_canny_roi_right )
+        #cv2.imshow("canny R", img_canny_right )
+        #cv2.imshow("gray", img_gray_left )
+        #cv2.imshow("img white", img_white_l)
+        # cv2.imshow("img edges", img_edges_left )
         cv2.waitKey(1)
         elapsed_time = end_time - start_time
         self.get_logger().info(f"Tiempo de procesamiento: {elapsed_time*1000:.2f} ms") 
