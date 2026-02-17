@@ -15,47 +15,41 @@ def warp(img, src, dst):
     M = cv2.getPerspectiveTransform(src.astype(np.float32), dst.astype(np.float32))
     return cv2.warpPerspective(img, M, (img.shape[1], img.shape[0]))
 
-def filters(img_bgr):
-        # 1) Filtrado por color negro en TODA la imagen
-        img_hsv = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2HSV)
-        lower_black = np.array([0, 0, 0])
-        upper_black = np.array([180, 80, 60])
-        mask_black = cv2.inRange(img_hsv, lower_black, upper_black)
 
-        kernel = np.ones((30,30), np.uint8)
-        mask_black = cv2.morphologyEx(mask_black, cv2.MORPH_CLOSE, kernel, iterations = 15)
-        #mask_black = cv2.morphologyEx(mask_black, cv2.MORPH_OPEN, kernel, iterations = 1)
-        
-        # 2) Gris + blur en TODA la imagen
-        img_grey = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
-        img_blur = cv2.GaussianBlur(img_grey, (3, 3), 0, 0)
-
-        # 3) Aplicar máscara negra sobre el gris
-        masked_gray = cv2.bitwise_and(img_blur, img_blur, mask=mask_black)
-
-        # 4) Canny sobre la imagen ya filtrada por color
-        img_canny = cv2.Canny(masked_gray, 40, 120)
-        
-        return img_canny
 
 # Filtro optimizado con OpenCV Cuda
 def filters_cuda(img_bgr):
     stream = cv2.cuda_Stream()
+
     # Sube a GPU
     gpu_img = cv2.cuda_GpuMat()
     gpu_img.upload (img_bgr,stream)
+
     # BGR a Gray
     gpu_gray= cv2.cuda.cvtColor(gpu_img, cv2.COLOR_BGR2GRAY)
 
-    # Clahe = mejora el contraste
-    clahe = cv2.cuda.createCLAHE( clipLimit = 3.0 , tileGridSize = (8,8))
+    # Clahe = mejora el contraste   3.0 era el valor original pero lo bajé para evitar ruido
+    clahe = cv2.cuda.createCLAHE( clipLimit = 1.5 , tileGridSize = (8,8))
     gpu_gray = clahe.apply(gpu_gray, stream)
 
     # Blur
     gauss1 = cv2.cuda.createGaussianFilter(cv2.CV_8UC1, cv2.CV_8UC1 , (5,5), 1)
     gpu_blur = gauss1.apply(gpu_gray)
-    # Threshold = Pasar a binario
-    _ , gpu_white = cv2.cuda.threshold(gpu_blur,200,255,cv2.THRESH_BINARY)
+
+
+
+    # Threshold = Pasar a binario   200 era el valor original pero lo subí para evitar ruido
+    _ , gpu_white = cv2.cuda.threshold(gpu_blur,195 ,255,cv2.THRESH_BINARY)
+    
+    #Opening: Elimina manchas pequeñas de ruido 
+    kernel_open = cv2.getStructuringElement(cv2.MORPH_RECT, (11,11))
+    morph_open = cv2.cuda.createMorphologyFilter(cv2.MORPH_OPEN, cv2.CV_8UC1, kernel_open)
+    gpu_white = morph_open.apply(gpu_white)
+
+    #Closing: Une linas fragmentadas
+    kernel_close = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 10))
+    morph_close = cv2.cuda.createMorphologyFilter(cv2.MORPH_CLOSE, cv2.CV_8UC1, kernel_close)
+    gpu_white = morph_close.apply(gpu_white)
 
     # después de tener gpu_white
     gpu_gray_masked = cv2.cuda.bitwise_and(gpu_gray, gpu_gray, mask=gpu_white)
@@ -79,7 +73,8 @@ def filters_cuda(img_bgr):
 
 
 def sliding_window(binary_warped):
-    histogram = np.sum(binary_warped, axis=0)
+    histogram = np.sum(binary_warped[binary_warped.shape[0]//2:, :], axis=0)
+    histogram = cv2.GaussianBlur(histogram.astype(np.float32), (51, 1), 0)
     base = np.argmax(histogram)
     
     nwindows = 12
@@ -108,7 +103,10 @@ def sliding_window(binary_warped):
 
         
         if len(good_inds) > minpix:
-            current_x = np.int32(np.mean(nonzerox[good_inds]))
+            new_x = int (np.mean(nonzerox[good_inds]))
+            if abs(new_x - current_x) < 40:
+                current_x = new_x
+            # current_x = np.int32(np.mean(nonzerox[good_inds]))
 
     
     lane_inds = np.concatenate(lane_inds)
@@ -121,6 +119,9 @@ def sliding_window(binary_warped):
 
  
     fit = np.polyfit(y, x, 2)
+
+    if abs(fit[0]) > 0.001 or abs(fit[1]) > 5:
+        return out_img, None, None
     
     ploty = np.linspace(0, binary_warped.shape[0]-1, binary_warped.shape[0])
     fitx = fit[0]*ploty**2 + fit[1]*ploty + fit[2]
@@ -135,7 +136,7 @@ def sliding_window(binary_warped):
 
 
 def measure_curvature(ploty, fit):
-    ym_per_pix = 0.60/720
+    ym_per_pix = 0.70/720
     xm_per_pix = 0.40/1280
     
     y_eval = np.max(ploty)
@@ -230,9 +231,9 @@ class LaneDetectorNode(Node):
         self.direction_pwm_pub = self.create_publisher(String, 'direction_servo', qos_profile)
         self.throttle_pwm_pub  = self.create_publisher(String, 'throttle_motor', qos_profile)
 
-        ruta_svo = "/home/traxxas/Documents/ZED/video_prueba.svo2"
-        #self.zed = iniciar_zed(ruta_svo)
-        self.zed = iniciar_zed()
+        ruta_svo = "/home/traxxas/Documents/ZED/Vuelta_izquierda.svo2"
+        self.zed = iniciar_zed(ruta_svo)
+        #self.zed = iniciar_zed()
 
         if self.zed is None:
             self.get_logger().error("No se pudo inicializar la ZED con el SVO")
@@ -272,18 +273,18 @@ class LaneDetectorNode(Node):
 
         h, w = img_canny_left.shape[:2]
         # 5) Definir ROI SOLO PARA CANNY 
-        vertices_left = np.array([[
-            (int(0.24 * w), int(0.514 * h)),
-            (int(0.531 * w), int(0.514 * h)),
-            (int(0.531 * w), int(0.83 * h)),
-            (int(0.195 * w), int(0.83* h) )
+        vertices_right = np.array([[
+            (int(0.703 * w), int(0.55 * h)),
+            (int(0.859 * w), int(0.55 * h)),
+            (int(0.97 * w), h),
+            (int(0.585 * w), h )
         ]], dtype=np.int32)
 
-        vertices_right = np.array([[
-            (int(0.469 * w), int(0.583 * h)),
-            (int(0.86 * w), int(0.583 * h)),
-            (int(0.86 * w), int(0.83 * h)),
-            (int(0.469 * w), int(0.83 * h))
+        vertices_left = np.array([[
+            (int(0.234 * w), int(0.55 * h)),
+            (int(0.468 * w), int(0.55 * h)),
+            (int(0.546 * w), h),
+            (int(0.156 * w), h)
         ]], dtype=np.int32)
 
         #Imagen izquierda
@@ -367,15 +368,19 @@ class LaneDetectorNode(Node):
         
         #cv2.imshow("Original left", img_bgr_left)
         #cv2.imshow("Original right", img_bgr_right)
-        #cv2.imshow("Sliding Window Left", sliding_img_left)
+        cv2.imshow("Sliding Window Left", sliding_img_left)
         #cv2.imshow("Sliding Window Right", sliding_img_right)  
         cv2.imshow("Warped left", warped_left)
         cv2.imshow("Warped right", warped_right)
         #cv2.imshow("canny", img_canny_left )
-        #cv2.imshow("canny R", img_canny_right )
+        #cv2.imshow("canny_right",img_canny_right)
+        #cv2.imshow("roi R", img_roi_mask_right )
+        #cv2.imshow("roi l", img_roi_mask_left )
+        #cv2.imshow("img normal r", img_bgr_left)
+
         #cv2.imshow("gray", img_gray_left )
-        #cv2.imshow("img white", img_white_l)
-        # cv2.imshow("img edges", img_edges_left )
+        cv2.imshow("img white", img_white_l)
+        #cv2.imshow("img edges", img_edges_left )
         cv2.waitKey(1)
         elapsed_time = end_time - start_time
         self.get_logger().info(f"Tiempo de procesamiento: {elapsed_time*1000:.2f} ms") 
