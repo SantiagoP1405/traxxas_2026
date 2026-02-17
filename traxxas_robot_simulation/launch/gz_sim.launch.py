@@ -69,11 +69,19 @@ def generate_launch_description():
         parameters=[{'config_file' : gz_bridge_config_path}]
     )
 
+    # Node for PWM to cmd_vel conversion
+    pwm_to_cmd_vel_node = Node(
+        package = 'traxxas_cmd_sim',
+        executable='cmd_sim',
+        parameters=[{'use_sim_time': True}]
+    )
+
     return LaunchDescription([
         robot_state_publisher_node,
         gz_sim_launch,
         spawn_robot_node,
         gz_bridge_node,
-        rviz2_node
+        rviz2_node,
+        pwm_to_cmd_vel_node,
     ])
 

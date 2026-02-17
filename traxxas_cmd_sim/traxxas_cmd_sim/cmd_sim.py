@@ -4,10 +4,15 @@ import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
 from std_msgs.msg import String
+import math
+
 
 
 class PWMToCmdVelNode(Node):
     def __init__(self):
+        self.wheelbase = 0.35  # meters
+        self.max_steering_angle = 0.5236  # 30 degrees in radians
+
         super().__init__('pwm_to_cmd_vel_node')
         
         # Publishers
@@ -87,33 +92,41 @@ class PWMToCmdVelNode(Node):
             self.get_logger().warn(f'Invalid throttle value received: {msg.data}')
     
     def direction_callback(self, msg):
-        try:
-            pwm_value = int(msg.data)
-            
-            # Map direction PWM to angular velocity (1.0 to -1.0)
-            # Left (1669) -> 1.0, Center (2642) -> 0.0, Right (3276) -> -1.0
-            self.current_angular_z = self.map_value(
-                pwm_value,
-                self.direction_left,     # 1669
-                self.direction_center,   # 2642
-                self.direction_right,    # 3276
-                1.0,   # left (positive angular for left turn)
-                0.0,   # center
-                -1.0   # right (negative angular for right turn)
-            )
-            
-            # Deadzone para neutro (±0.05)
-            if abs(self.current_angular_z) < 0.05:
-                self.current_angular_z = 0.0
-            
-            # Clamp values
-            self.current_angular_z = max(-1.0, min(1.0, self.current_angular_z))
-            
-            self.get_logger().info(f'Direction PWM: {pwm_value} -> angular.z: {self.current_angular_z:.3f}')
-            self.publish_cmd_vel()
-            
-        except ValueError:
-            self.get_logger().warn(f'Invalid direction value received: {msg.data}')
+        pwm_value = int(msg.data)
+
+        # Map PWM to steering angle δ in radians
+        # Left -> +max_angle
+        # Center -> 0
+        # Right -> -max_angle
+
+        delta = self.map_value(
+            pwm_value,
+            self.direction_left,
+            self.direction_center,
+            self.direction_right,
+            self.max_steering_angle,
+            0.0,
+            -self.max_steering_angle
+        )
+
+        # Deadzone pequeña
+        if abs(delta) < 0.02:
+            delta = 0.0
+
+        # Ackermann model
+        # ω = V / L * tan(δ)
+        if abs(self.current_linear_x) > 0.001:
+            self.current_angular_z = (
+                self.current_linear_x / self.wheelbase
+            ) * math.tan(delta)
+        else:
+            self.current_angular_z = 0.0
+
+        self.get_logger().info(
+            f'PWM: {pwm_value} -> delta: {delta:.3f} rad -> omega: {self.current_angular_z:.3f}'
+        )
+
+        self.publish_cmd_vel()
     
     def publish_cmd_vel(self):
         """Publish the current velocity command"""

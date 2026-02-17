@@ -29,7 +29,7 @@
     <xacro:property name="counter_max_steering_angle" value="0.349066" />
     <xacro:property name="max_steering_angular_vel" value="1.570796" />
     <xacro:property name="max_steering_effort" value="1.0" />
-    <xacro:property name="max_vel" value="15.665470085" />
+    <xacro:property name="max_vel" value="4" />
     <xacro:property name="max_effort" value="10.0" />
     <xacro:property name="max_wheel_angular_vel" value="${max_vel / wheel_radius}" />
     <!-- Front axis -->
