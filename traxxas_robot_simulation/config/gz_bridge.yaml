@@ -30,27 +30,27 @@
 
 #   ZED2 Custom Camera Topics
   # Right lens
-- ros_topic_name : "/zed2_custom/right/image_raw"
-  gz_topic_name : "/zed2_custom/right/image_raw"
+- ros_topic_name : "/zed/zed_node/right/image_rect_color"
+  gz_topic_name : "/zed/zed_node/right/image_rect_color"
   ros_type_name : "sensor_msgs/msg/Image"
   gz_type_name : "gz.msgs.Image"
   direction : GZ_TO_ROS
 
-- ros_topic_name : "/zed2_custom/right/camera_info"
-  gz_topic_name  : "/zed2_custom/right/camera_info"
+- ros_topic_name : "/zed/zed_node/right/camera_info"
+  gz_topic_name  : "/zed/zed_node/right/camera_info"
   ros_type_name  : "sensor_msgs/msg/CameraInfo"
   gz_type_name   : "gz.msgs.CameraInfo"
   direction      : GZ_TO_ROS
 
   # Left lens
-- ros_topic_name : "/zed2_custom/left/image_raw"
-  gz_topic_name : "/zed2_custom/left/image_raw"
+- ros_topic_name : "/zed/zed_node/left/image_rect_color"
+  gz_topic_name : "/zed/zed_node/left/image_rect_color"
   ros_type_name : "sensor_msgs/msg/Image"
   gz_type_name : "gz.msgs.Image"
   direction : GZ_TO_ROS
 
-- ros_topic_name : "/zed2_custom/left/camera_info"
-  gz_topic_name  : "/zed2_custom/left/camera_info"
+- ros_topic_name : "/zed/zed_node/left/camera_info"
+  gz_topic_name  : "/zed/zed_node/left/camera_info"
   ros_type_name  : "sensor_msgs/msg/CameraInfo"
   gz_type_name   : "gz.msgs.CameraInfo"
   direction      : GZ_TO_ROS
