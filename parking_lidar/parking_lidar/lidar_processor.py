@@ -7,9 +7,10 @@ from std_msgs.msg import String
 import math
 
 FRONT_STOP_DIST = 0.20
-RIGHT_FREE_DIST = 0.20
-LEFT_FREE_DIST  = 0.20
+RIGHT_FREE_DIST = 0.50
+LEFT_FREE_DIST  = 0.50
 REAR_FREE_DIST  = 0.20
+
 
 class LidarProcessor(Node):
     def __init__(self):
@@ -74,6 +75,7 @@ def main():
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()
