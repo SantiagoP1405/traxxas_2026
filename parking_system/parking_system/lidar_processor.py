@@ -14,7 +14,7 @@ class LidarProcessor(Node):
         # CAMBIO UNICO: De '/scan' a '/qcar/scan' para que funcione en el coche
         self.create_subscription(
             LaserScan,
-            '/qcar/scan',
+            '/scan',
             self.scan_callback,
             10
         )
