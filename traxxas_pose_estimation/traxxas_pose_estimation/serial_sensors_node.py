@@ -3,7 +3,7 @@ from rclpy.node import Node
 import serial
 import math
 from sensor_msgs.msg import Imu
-from geometry_msgs.msg import TwistStamped
+from geometry_msgs.msg import TwistStamped, Vector3Stamped
 
 
 class SerialSensorsNode(Node):
@@ -30,6 +30,7 @@ class SerialSensorsNode(Node):
         # ---------------- Publishers ----------------
         self.pub_imu = self.create_publisher(Imu, 'imu/data', 20)
         self.pub_twist = self.create_publisher(TwistStamped, 'wheel/twist', 20)
+        self.pub_euler = self.create_publisher(Vector3Stamped, 'imu/euler', 20)
 
         # ---------------- Serial ----------------
         try:
@@ -54,24 +55,28 @@ class SerialSensorsNode(Node):
                 return
 
             parts = line.split(',')
-            if len(parts) != 12:
+            if len(parts) != 15:
                 return
 
             # ---------------- Parse CSV ----------------
             omega_motor = float(parts[1])
 
-            qw = float(parts[2])
-            qx = float(parts[3])
-            qy = float(parts[4])
-            qz = float(parts[5])
+            yaw   = float(parts[2])
+            pitch = float(parts[3])
+            roll  = float(parts[4])
 
-            gx = float(parts[6])
-            gy = float(parts[7])
-            gz = float(parts[8])
+            qw = float(parts[5])
+            qx = float(parts[6])
+            qy = float(parts[7])
+            qz = float(parts[8])
 
-            ax = float(parts[9])
-            ay = float(parts[10])
-            az = float(parts[11])
+            gx = float(parts[9])
+            gy = float(parts[10])
+            gz = float(parts[11])
+
+            ax = float(parts[12])
+            ay = float(parts[13])
+            az = float(parts[14])
 
             # ---------------- Compute velocity ----------------
             v_mps = omega_motor * self.v_gain
@@ -79,6 +84,7 @@ class SerialSensorsNode(Node):
             now = self.get_clock().now().to_msg()
 
             # ---------------- Publish IMU ----------------
+            # Quaternions
             imu_msg = Imu()
             imu_msg.header.stamp = now
             imu_msg.header.frame_id = self.frame_id
@@ -97,6 +103,17 @@ class SerialSensorsNode(Node):
             imu_msg.linear_acceleration.z = az
 
             self.pub_imu.publish(imu_msg)
+
+            # Euler angles
+            euler_msg = Vector3Stamped()
+            euler_msg.header.stamp = now
+            euler_msg.header.frame_id = self.frame_id
+
+            euler_msg.vector.x = roll   # X = roll
+            euler_msg.vector.y = pitch  # Y = pitch
+            euler_msg.vector.z = yaw    # Z = yaw
+
+            self.pub_euler.publish(euler_msg)
 
             # ---------------- Publish Twist ----------------
             twist_msg = TwistStamped()
