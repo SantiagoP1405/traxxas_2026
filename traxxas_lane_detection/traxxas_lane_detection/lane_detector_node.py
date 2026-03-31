@@ -11,10 +11,10 @@ import pyzed.sl as sl
 import time
 
 
+
 def warp(img, src, dst):
     M = cv2.getPerspectiveTransform(src.astype(np.float32), dst.astype(np.float32))
     return cv2.warpPerspective(img, M, (img.shape[1], img.shape[0]))
-
 
 
 # Filtro optimizado con OpenCV Cuda
@@ -39,15 +39,15 @@ def filters_cuda(img_bgr):
 
 
     # Threshold = Pasar a binario   200 era el valor original pero lo subí para evitar ruido
-    _ , gpu_white = cv2.cuda.threshold(gpu_blur,195 ,255,cv2.THRESH_BINARY)
-    
+    _ , gpu_white = cv2.cuda.threshold(gpu_blur, 201 ,255,cv2.THRESH_BINARY)
+    gpu_white_1 = gpu_white
     #Opening: Elimina manchas pequeñas de ruido 
     kernel_open = cv2.getStructuringElement(cv2.MORPH_RECT, (11,11))
     morph_open = cv2.cuda.createMorphologyFilter(cv2.MORPH_OPEN, cv2.CV_8UC1, kernel_open)
     gpu_white = morph_open.apply(gpu_white)
 
     #Closing: Une linas fragmentadas
-    kernel_close = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 10))
+    kernel_close = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
     morph_close = cv2.cuda.createMorphologyFilter(cv2.MORPH_CLOSE, cv2.CV_8UC1, kernel_close)
     gpu_white = morph_close.apply(gpu_white)
 
@@ -62,12 +62,12 @@ def filters_cuda(img_bgr):
     gpu_edges = canny.detect(gpu_blur)  
 
     # Unir gpu_edges con gpu_white
-    gpu_lane = cv2.cuda.bitwise_and(gpu_white,gpu_edges)
+    gpu_lane = cv2.cuda.bitwise_or(gpu_white,gpu_edges)
 
     img_canny = gpu_lane.download()
     #img_gray = gpu_gray.download()
     #img_edges = gpu_edges.download()
-    img_white = gpu_white.download()
+    img_white = gpu_white_1.download()
     
     return img_canny  , img_white #, img_gray , img_edges , img_white
 
@@ -94,6 +94,7 @@ def sliding_window(binary_warped):
         win_low = current_x - margin
         win_high = current_x + margin
 
+
         cv2.rectangle(out_img,(win_low,win_y_low),(win_high,win_y_high), (0,255,0), 2) 
         
         good_inds = ((nonzeroy >= win_y_low) & (nonzeroy < win_y_high) & 
@@ -101,12 +102,14 @@ def sliding_window(binary_warped):
         
         lane_inds.append(good_inds)
 
+
         
         if len(good_inds) > minpix:
             new_x = int (np.mean(nonzerox[good_inds]))
             if abs(new_x - current_x) < 40:
                 current_x = new_x
             # current_x = np.int32(np.mean(nonzerox[good_inds]))
+
 
     
     lane_inds = np.concatenate(lane_inds)
@@ -117,8 +120,10 @@ def sliding_window(binary_warped):
     if len(x) < min_pixels:
         return out_img, None, None
 
+
  
     fit = np.polyfit(y, x, 2)
+
 
     if abs(fit[0]) > 0.001 or abs(fit[1]) > 5:
         return out_img, None, None
@@ -135,6 +140,7 @@ def sliding_window(binary_warped):
 
 
 
+
 def measure_curvature(ploty, fit):
     ym_per_pix = 0.70/720
     xm_per_pix = 0.40/1280
@@ -143,16 +149,20 @@ def measure_curvature(ploty, fit):
     
     fitx = fit[0]*ploty**2 + fit[1]*ploty + fit[2]
 
+
     
     fit_cr = np.polyfit(ploty*ym_per_pix, fitx*xm_per_pix, 2)
     
     curverad = ((1 + (2*fit_cr[0]*y_eval*ym_per_pix + fit_cr[1])**2)**1.5) / np.absolute(2*fit_cr[0])
 
+
     
     return curverad
 
+
 def steering_from_curvature(left_curvature, right_curvature):
     L=0.28
+
 
     if right_curvature is not None and left_curvature is not None and right_curvature > left_curvature:
         R=right_curvature
@@ -167,6 +177,7 @@ def steering_from_curvature(left_curvature, right_curvature):
     delta_rad=math.atan(L/R)
     delta_deg=math.degrees(delta_rad)
     return delta_deg
+
 
 
 def angle_to_pwm(delta_deg, left_curv, right_curv):
@@ -188,6 +199,7 @@ def angle_to_pwm(delta_deg, left_curv, right_curv):
     
     norm = delta_deg / max_steer_deg
 
+
     if norm >= 0:
         pwm = pwm_center + norm * (pwm_max - pwm_center)
     else:
@@ -197,12 +209,15 @@ def angle_to_pwm(delta_deg, left_curv, right_curv):
 
 
 
+
 def iniciar_zed(ruta_svo=None):
     zed = sl.Camera()
     init_params = sl.InitParameters()
 
+
     init_params.depth_mode = sl.DEPTH_MODE.PERFORMANCE
     init_params.coordinate_units = sl.UNIT.METER
+
 
     if ruta_svo:
         print(f"Modo: Leyendo archivo grabado -> {ruta_svo}")
@@ -213,12 +228,15 @@ def iniciar_zed(ruta_svo=None):
         init_params.camera_resolution = sl.RESOLUTION.HD720
         init_params.camera_fps = 30
 
+
     status = zed.open(init_params)
     if status != sl.ERROR_CODE.SUCCESS:
         print(f"Error al abrir ZED: {status}")
         return None
 
+
     return zed
+
 
 class LaneDetectorNode(Node):
     def __init__(self):
@@ -231,23 +249,29 @@ class LaneDetectorNode(Node):
         self.direction_pwm_pub = self.create_publisher(String, 'direction_servo', qos_profile)
         self.throttle_pwm_pub  = self.create_publisher(String, 'throttle_motor', qos_profile)
 
+
         ruta_svo = "/home/traxxas/Documents/ZED/Vuelta_izquierda.svo2"
         self.zed = iniciar_zed(ruta_svo)
         #self.zed = iniciar_zed()
+
 
         if self.zed is None:
             self.get_logger().error("No se pudo inicializar la ZED con el SVO")
             raise RuntimeError("Error inicializando ZED")
 
+
         self.zed_image_left = sl.Mat()
-        self.zed_image_right = sl.Mat()
+        # self.zed_image_right = sl.Mat()  # COMENTADO - No se usa
         self.runtime_params = sl.RuntimeParameters()
 
+
         cam_info = self.zed.get_camera_information()
+
 
         self.timer = self.create_timer(0.1, self.timer_callback)
         self.left_curve = None
         self.right_curve = None
+
 
     def timer_callback(self):
         start_time = time.time()
@@ -260,25 +284,28 @@ class LaneDetectorNode(Node):
             self.get_logger().warn(f"Error al leer frame: {grab_state}")
             return
 
+
         self.zed.retrieve_image(self.zed_image_left, sl.VIEW.LEFT)
-        self.zed.retrieve_image(self.zed_image_right, sl.VIEW.RIGHT)
+        # self.zed.retrieve_image(self.zed_image_right, sl.VIEW.RIGHT)  # COMENTADO
+
 
         img_bgr_left = self.zed_image_left.get_data()[:, :, :3]
-        img_bgr_right = self.zed_image_right.get_data()[:, :, :3]
+        # img_bgr_right = self.zed_image_right.get_data()[:, :, :3]  # COMENTADO
 
-        #img_canny_left, img_gray_left , img_edges_left ,img_white_left = filters_cuda(img_bgr_left)
-        #img_canny_right, img_gray_right , img_edges_right ,  img_white_right = filters_cuda(img_bgr_right)
+
         img_canny_left , img_white_l= filters_cuda(img_bgr_left)
-        img_canny_right, img_white_r  = filters_cuda(img_bgr_right)
+        # img_canny_right, img_white_r  = filters_cuda(img_bgr_right)  # COMENTADO
+
 
         h, w = img_canny_left.shape[:2]
         # 5) Definir ROI SOLO PARA CANNY 
-        vertices_right = np.array([[
-            (int(0.703 * w), int(0.55 * h)),
-            (int(0.859 * w), int(0.55 * h)),
-            (int(0.97 * w), h),
-            (int(0.585 * w), h )
-        ]], dtype=np.int32)
+        # vertices_right = np.array([[  # COMENTADO
+        #     (int(0.703 * w), int(0.55 * h)),
+        #     (int(0.859 * w), int(0.55 * h)),
+        #     (int(0.97 * w), h),
+        #     (int(0.585 * w), h )
+        # ]], dtype=np.int32)
+
 
         vertices_left = np.array([[
             (int(0.234 * w), int(0.55 * h)),
@@ -287,16 +314,19 @@ class LaneDetectorNode(Node):
             (int(0.156 * w), h)
         ]], dtype=np.int32)
 
+
         #Imagen izquierda
         img_roi_mask_left = np.zeros_like(img_canny_left, dtype=np.uint8)
         cv2.fillPoly(img_roi_mask_left, vertices_left, 255)
-        #Imagen derecha
-        img_roi_mask_right = np.zeros_like(img_canny_right, dtype=np.uint8)
-        cv2.fillPoly(img_roi_mask_right, vertices_right, 255)
+        #Imagen derecha - COMENTADO
+        # img_roi_mask_right = np.zeros_like(img_canny_right, dtype=np.uint8)
+        # cv2.fillPoly(img_roi_mask_right, vertices_right, 255)
+
 
         # 6) imagen roi
         img_canny_roi_left = cv2.bitwise_and(img_canny_left, img_canny_left, mask=img_roi_mask_left)
-        img_canny_roi_right = cv2.bitwise_and(img_canny_right, img_canny_right, mask=img_roi_mask_right)
+        # img_canny_roi_right = cv2.bitwise_and(img_canny_right, img_canny_right, mask=img_roi_mask_right)  # COMENTADO
+
 
 
         # 7) Warp usando el Canny ya enmascarado
@@ -307,12 +337,15 @@ class LaneDetectorNode(Node):
             [int(0.35 * w), h]
         ], dtype=np.int32)
 
+
         warped_left = warp(img_canny_roi_left, vertices_left[0], dst1)
-        warped_right = warp(img_canny_roi_right, vertices_right[0], dst1)
+        # warped_right = warp(img_canny_roi_right, vertices_right[0], dst1)  # COMENTADO
+
 
         # 8) Sliding window
         sliding_img_left, left_fit, left_ploty = sliding_window(warped_left)
-        sliding_img_right, right_fit, right_ploty = sliding_window(warped_right)
+        # sliding_img_right, right_fit, right_ploty = sliding_window(warped_right)  # COMENTADO
+
 
         # Calcular curvaturas individuales
         if left_fit is not None and left_ploty is not None:
@@ -320,10 +353,14 @@ class LaneDetectorNode(Node):
         else:
             self.left_curve = None
         
-        if right_fit is not None and right_ploty is not None:
-            self.right_curve = measure_curvature(right_ploty, right_fit)
-        else:
-            self.right_curve = None
+        # Fijar right_curve como None (no se usa ojo derecho)
+        self.right_curve = None
+        
+        # if right_fit is not None and right_ploty is not None:  # COMENTADO
+        #     self.right_curve = measure_curvature(right_ploty, right_fit)
+        # else:
+        #     self.right_curve = None
+
 
         # Calcular PWM basado en detección de carriles
         if self.left_curve is None and self.right_curve is None:
@@ -333,6 +370,7 @@ class LaneDetectorNode(Node):
             delta_deg = steering_from_curvature(self.left_curve, self.right_curve)
             pwm = angle_to_pwm(delta_deg, self.left_curve, self.right_curve)
             self.get_logger().info("Ángulo dirección: {:.2f}°  PWM: {}".format(delta_deg, pwm))
+
 
         # Visualización para imagen izquierda
         if left_fit is None:
@@ -344,42 +382,47 @@ class LaneDetectorNode(Node):
                         (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6,
                         (255, 255, 255), 2)
 
-        # Visualización para imagen derecha
-        if right_fit is None:
-            cv2.putText(sliding_img_right, "Carril derecho no detectado", (10, 30),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
-        else:
-            cv2.putText(sliding_img_right,
-                        f"Right: {int(self.right_curve*100)}cm",
-                        (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6,
-                        (255, 255, 255), 2)
+
+        # Visualización para imagen derecha - COMENTADO
+        # if right_fit is None:
+        #     cv2.putText(sliding_img_right, "Carril derecho no detectado", (10, 30),
+        #                 cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+        # else:
+        #     cv2.putText(sliding_img_right,
+        #                 f"Right: {int(self.right_curve*100)}cm",
+        #                 (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6,
+        #                 (255, 255, 255), 2)
+
 
         pwm_msg = String()
         pwm_msg.data = str(pwm)
         self.direction_pwm_pub.publish(pwm_msg)
 
-        throttle_pwm = 2700
+
+        throttle_pwm = 3000
         throttle_msg = String()
         throttle_msg.data = str(throttle_pwm)
         self.throttle_pwm_pub.publish(throttle_msg)
 
+
         end_time = time.time()
         
         
-        #cv2.imshow("Original left", img_bgr_left)
-        #cv2.imshow("Original right", img_bgr_right)
+        cv2.imshow("Original left", img_bgr_left)
+        #cv2.imshow("Original right", img_bgr_right)  # COMENTADO
         cv2.imshow("Sliding Window Left", sliding_img_left)
-        #cv2.imshow("Sliding Window Right", sliding_img_right)  
+        # cv2.imshow("Sliding Window Right", sliding_img_right)  # COMENTADO
         cv2.imshow("Warped left", warped_left)
-        cv2.imshow("Warped right", warped_right)
+        # cv2.imshow("Warped right", warped_right)  # COMENTADO
         #cv2.imshow("canny", img_canny_left )
-        #cv2.imshow("canny_right",img_canny_right)
-        #cv2.imshow("roi R", img_roi_mask_right )
-        #cv2.imshow("roi l", img_roi_mask_left )
+        #cv2.imshow("canny_right",img_canny_right)  # COMENTADO
+        # cv2.imshow("roi R", img_roi_mask_right )  # COMENTADO
+        cv2.imshow("roi l", img_roi_mask_left )
         #cv2.imshow("img normal r", img_bgr_left)
 
+
         #cv2.imshow("gray", img_gray_left )
-        cv2.imshow("img white", img_white_l)
+        #cv2.imshow("img white", img_white_l)
         #cv2.imshow("img edges", img_edges_left )
         cv2.waitKey(1)
         elapsed_time = end_time - start_time
@@ -387,19 +430,23 @@ class LaneDetectorNode(Node):
         
 
 
+
 def main(args=None):
     rclpy.init(args=args)
     node = LaneDetectorNode()
+
 
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
         pass
 
+
     cv2.destroyAllWindows()
     node.destroy_node()
     rclpy.shutdown()
     
+
 
 
 if __name__ == '__main__':

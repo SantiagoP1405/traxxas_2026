@@ -24,7 +24,8 @@ setup(
     },
     entry_points={
         'console_scripts': [
-        'lane_detector_node = traxxas_lane_detection.lane_detector_node:main'
+        'lane_detector_node = traxxas_lane_detection.lane_detector_node:main',
+        'lane_detector_yolo = traxxas_lane_detection.lane_detector_yolo:main'
         ],
     },
 )
