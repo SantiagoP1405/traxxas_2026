@@ -11,9 +11,9 @@ class JoyMicroRosControl(Node):
     STEER_MIN = 1669     # Máxima izquierda
     
     # PWM values para THROTTLE (14 bits, 100Hz)
-    THROTTLE_MAX = 3276    # Máximo adelante
+    THROTTLE_MAX = 2625    # Máximo adelante
     THROTTLE_CENTER = 2457  # Neutro
-    THROTTLE_MIN = 1638     # Máximo reversa
+    THROTTLE_MIN = 2200     # Máximo reversa
     
     def __init__(self):
         super().__init__('joystick_microros_controller')
@@ -53,11 +53,11 @@ class JoyMicroRosControl(Node):
         
         # R2 (axes[5]) para adelante: 1.0 = sin presionar, -1.0 = full presionado
         # Normalizar a rango 0.0 (sin presionar) a 1.0 (full presionado)
-        self.throttle_fwd_ = (1.0 - msg.axes[5]) / 2.0
+        self.throttle_fwd_ = (1.0 - msg.axes[4]) / 2.0
         
         # L2 (axes[2]) para reversa: 1.0 = sin presionar, -1.0 = full presionado
         # Normalizar a rango 0.0 (sin presionar) a 1.0 (full presionado)
-        self.throttle_rev_ = (1.0 - msg.axes[2]) / 2.0
+        self.throttle_rev_ = (1.0 - msg.axes[3]) / 2.0
     
     def timer_callback(self):
         # === STEERING (L_motor_pwm) ===
