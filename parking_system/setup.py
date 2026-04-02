@@ -36,7 +36,8 @@ setup(
             'parking_controller3 = parking_system.parking_controller3:main',
             'parking_controller4 = parking_system.parking_controller4:main',
             'parking_controller5 = parking_system.parking_controller5:main',
-            'parking_controller_traxxas = parking_system.parking_controller_traxxas:main', # to launch
+            'parking_controller_traxxas = parking_system.parking_controller_traxxas:main',
+            'lane_detector_camera = parking_system.lane_detector_camera:main',
         ],
     },
 )
