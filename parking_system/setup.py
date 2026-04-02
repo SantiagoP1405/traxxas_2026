@@ -1,4 +1,6 @@
 from setuptools import setup
+import os
+from glob import glob
 
 package_name = 'parking_system'
 
@@ -10,6 +12,7 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        (os.path.join('share', package_name,'launch'), glob('launch/*')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -22,8 +25,8 @@ setup(
         'console_scripts': [
             'fsm_parking = parking_system.fsm_parking:main',
             'fsm_parking2 = parking_system.fsm_parking2:main',
-            'fsm_parking3 = parking_system.fsm_parking3:main',
-            'lidar_processor = parking_system.lidar_processor:main',
+            'fsm_parking3 = parking_system.fsm_parking3:main', # to launch
+            'lidar_processor = parking_system.lidar_processor:main', # to launch
             'parking_controller = parking_system.parking_controller:main',
             'test_motors = parking_system.test_motors:main',
             'test_sensors = parking_system.test_sensors:main',

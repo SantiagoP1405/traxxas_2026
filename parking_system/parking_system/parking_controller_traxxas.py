@@ -71,6 +71,9 @@ class ParkingControllerTraxxas(Node):
     def __init__(self):
         super().__init__('parking_controller_traxxas')
 
+        self.declare_parameter('serial_port', '/dev/ttyUSB0')
+        SERIAL_PORT = self.get_parameter('serial_port').value
+
         self.state        = 'ORIENTANDOSE'
         self.parking_side = 'RIGHT'
         self.yaw          = 0.0
