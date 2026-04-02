@@ -3,14 +3,14 @@
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
-from sensor_msgs.msg import Imu
+from geometry_msgs.msg import Vector3Stamped  # <-- CAMBIADO DE Imu A Vector3Stamped
 from std_msgs.msg import String, Float32
 import math
 import serial
 import time
 
 # --- CONFIGURACION DE HARDWARE ---
-SERIAL_PORT = '/dev/ttyUSB0'
+SERIAL_PORT = '/dev/ttyUSB1'
 BAUD_RATE   = 115200
 
 # --- LIMITES DE SEGURIDAD LÓGICA ---
@@ -36,12 +36,12 @@ ALEJARSE_SPEED      = 0.072
 ALEJARSE_SPEED_LEFT = 0.072   
 ALEJARSE_STEER      = 0.30
 
-# --- CONSTANTES PID ENDEREZAR ---
-KP_YAW      = 0.45
+# --- CONSTANTES PID ENDEREZAR (ADAPTADAS A GRADOS) ---
+KP_YAW      = 0.008  # Reducido para manejar grados
 KP_LAT      = 15.0
 MAX_ANG_PID = 0.30
 
-ALIGN_TOL  = 0.08
+ALIGN_TOL  = 4.5     # Tolerancia en grados
 CENTER_TOL = 0.10
 
 # --- SENSOR INFRARROJO DE BANQUETA ---
@@ -130,8 +130,9 @@ class ParkingControllerTraxxas(Node):
         # --- SUSCRIPCIONES ---
         self.create_subscription(String,  '/parking/state',         self.state_cb,     10)
         self.create_subscription(String,  '/parking/perception',    self.perception_cb, 10)
-        self.create_subscription(Imu,     '/imu/euler',              self.imu_cb,       10) #/imu/data
-        self.create_subscription(Float32, '/qcar/lane_angle_ema',   self.angle_cb,      10)
+        # SUSCRIPCIÓN CORREGIDA PARA VECTOR3STAMPED Y EULER
+        self.create_subscription(Vector3Stamped, '/imu/euler',      self.imu_cb,       10) 
+        self.create_subscription(Float32, '/qcar/lane_angle_ema',   self.angle_cb,     10)
 
         # --- PUBLICADORES (NUEVO FORMATO TRAXXAS) ---
         qos_profile = QoSProfile(
@@ -144,7 +145,7 @@ class ParkingControllerTraxxas(Node):
         self.state_pub         = self.create_publisher(String, '/parking/state_feedback', 10)
 
         self.timer = self.create_timer(0.05, self.loop)
-        self.get_logger().info('Parking Controller Traxxas iniciado: PWM configurado.')
+        self.get_logger().info('Parking Controller Traxxas iniciado: Lógica IMU actualizada a GRADOS con PWM.')
 
     def angle_cb(self, msg):
         self.lane_angle = msg.data * -1.0
@@ -175,15 +176,18 @@ class ParkingControllerTraxxas(Node):
         except Exception:
             pass
 
+    # --- NUEVA FUNCIÓN IMU_CB ADAPTADA A GRADOS ---
     def imu_cb(self, msg):
-        q       = msg.orientation
-        raw_yaw = math.atan2(
-            2.0 * (q.w * q.z + q.x * q.y),
-            1.0 - 2.0 * (q.y * q.y + q.z * q.z)
-        )
+        raw_yaw = msg.vector.z 
+        
         if self.yaw_initial is None:
             self.yaw_initial = raw_yaw
+            
+        # Diferencia de grados
         self.yaw = raw_yaw - self.yaw_initial
+        
+        # Normalizamos para que siempre esté entre -180 y +180
+        self.yaw = (self.yaw + 180) % 360 - 180
 
     def filter_range(self, value, prev):
         if value > 5.0:
@@ -269,11 +273,12 @@ class ParkingControllerTraxxas(Node):
             self._publicar(0.0, 0.0)
             return
 
+        # --- LÓGICA DE TARGET EN GRADOS ---
         if self.state == 'ENDEREZAR' and self.prev_state != 'ENDEREZAR':
             if self.parking_side == 'RIGHT':
-                self.yaw_target = self.yaw_buscar - (math.pi / 2)
+                self.yaw_target = self.yaw_buscar - 90.0
             else:
-                self.yaw_target = self.yaw_buscar + (math.pi / 2)
+                self.yaw_target = self.yaw_buscar + 90.0
 
         self.prev_state = self.state
 
@@ -333,18 +338,21 @@ class ParkingControllerTraxxas(Node):
             speed_cmd = PARKING_SPEED
             steer_cmd = DIAGONAL_STEER if self.parking_side == 'RIGHT' else -DIAGONAL_STEER
 
+        # --- ENDEREZAR ADAPTADO A GRADOS ---
         elif self.state == 'ENDEREZAR':
             speed_cmd = PARKING_SPEED
 
             yaw_target = self.yaw_target if self.yaw_target else self.yaw
-            yaw_err    = math.atan2(math.sin(yaw_target - self.yaw), math.cos(yaw_target - self.yaw))
+            
+            # Cálculo del error circular para grados (-180 a 180)
+            yaw_err = (yaw_target - self.yaw + 180) % 360 - 180
             
             if self.parking_side == 'LEFT':
                 lat_err = (self.ul - self.ur) * 0.4
             else:
                 lat_err = self.ul - self.ur
 
-            ang       = KP_YAW * yaw_err - KP_LAT * lat_err
+            ang       = (KP_YAW * yaw_err) - (KP_LAT * lat_err)
             steer_cmd = self.clamp(ang, MAX_ANG_PID)
 
             if abs(yaw_err) < ALIGN_TOL: 
