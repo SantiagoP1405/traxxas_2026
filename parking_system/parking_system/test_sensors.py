@@ -10,7 +10,8 @@ class SensorTester(Node):
         super().__init__('sensor_tester')
         
         # --- CONFIGURACION ---
-        self.serial_port = '/dev/ttyUSB0' 
+        self.declare_parameter('serial_port', '/dev/ttyUSB1')
+        self.serial_port = self.get_parameter('serial_port').value
         self.baud_rate = 115200
 
         self.get_logger().info(f'Intentando conectar a {self.serial_port}...')
