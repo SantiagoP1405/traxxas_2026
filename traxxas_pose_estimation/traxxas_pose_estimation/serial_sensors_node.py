@@ -14,8 +14,8 @@ class SerialSensorsNode(Node):
         # ---------------- Parameters ----------------
         self.declare_parameter('port', '/dev/ttyACM0')
         self.declare_parameter('baud', 115200)
-        self.declare_parameter('gear_ratio', 15.3)
-        self.declare_parameter('wheel_radius', 0.055)
+        self.declare_parameter('gear_ratio', 17.72)
+        self.declare_parameter('wheel_radius', 0.0475)
         self.declare_parameter('frame_id', 'base_link')
 
         port = self.get_parameter('port').value

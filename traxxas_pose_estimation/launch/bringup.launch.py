@@ -36,17 +36,10 @@ def generate_launch_description():
         DeclareLaunchArgument('port', default_value='/dev/ttyACM0'),
         DeclareLaunchArgument('baud', default_value='115200'),
 
-        DeclareLaunchArgument('gear_ratio', default_value='15.3'),
-        DeclareLaunchArgument('wheel_radius', default_value='0.055'),
-        DeclareLaunchArgument('wheelbase', default_value='0.335'),
+        DeclareLaunchArgument('gear_ratio', default_value='17.72'),
+        DeclareLaunchArgument('wheel_radius', default_value='0.0475'),
+        DeclareLaunchArgument('wheelbase', default_value='0.324'),
 
-        # -------- Steering PWM mapping --------
-        DeclareLaunchArgument('pwm_min', default_value='1669'),
-        DeclareLaunchArgument('pwm_mid', default_value='2642'),
-        DeclareLaunchArgument('pwm_max', default_value='3276'),
-        DeclareLaunchArgument('delta_max', default_value='0.436'),
-        DeclareLaunchArgument('invert', default_value='false'),
-        DeclareLaunchArgument('deadband_pwm', default_value='15'),
 
         # -------- Frames --------
         DeclareLaunchArgument('frame_id', default_value='base_link'),
@@ -76,26 +69,10 @@ def generate_launch_description():
             }],
         ),
 
-        Node(
-            package='traxxas_pose_estimation',
-            executable='steering_angle_node',
-            name='steering_angle_node',
-            output='screen',
-            parameters=[{
-                'topic_in': 'direction_servo',
-                'topic_out': 'steering_angle',
-                'pwm_min': pwm_min,
-                'pwm_mid': pwm_mid,
-                'pwm_max': pwm_max,
-                'delta_max': delta_max,
-                'invert': invert,
-                'deadband_pwm': deadband_pwm,
-            }],
-        ),
 
         Node(
             package='traxxas_pose_estimation',
-            executable='odom_traxxas_node',
+            executable='ackermann_odom_node',
             name='ackermann_odom_node',
             output='screen',
             parameters=[{

@@ -14,9 +14,9 @@ class AckermannOdomNode(Node):
     def __init__(self):
         super().__init__('ackermann_odom_node')
 
-        self.declare_parameter('wheelbase', 0.335)      # L (m)
-        self.declare_parameter('gear_ratio', 15.3)      # GR
-        self.declare_parameter('wheel_radius', 0.055)   # r (m)
+        self.declare_parameter('wheelbase', 0.334)      # L (m)
+        self.declare_parameter('gear_ratio', 17.72)      # GR
+        self.declare_parameter('wheel_radius', 0.0475)   # r (m)
 
         self.declare_parameter('frame_odom', 'odom')
         self.declare_parameter('frame_base', 'base_link')
@@ -35,14 +35,13 @@ class AckermannOdomNode(Node):
         self.last_t = None
 
         self.v = 0.0
-        self.delta = 0.0  # optional, for debug/correction if you want
+        self.delta = 0.0  # optional
 
         # pubs/subs
         self.pub_odom = self.create_publisher(Odometry, 'odom', 10)
         self.tf_broadcaster = TransformBroadcaster(self)
 
-        # Inputs:
-        # - from serial_node you can publish TwistStamped with linear.x already v_mps
+        
         self.sub_twist = self.create_subscription(TwistStamped, 'wheel/twist', self.cb_twist, 20)
         self.sub_imu = self.create_subscription(Imu, 'imu/data', self.cb_imu, 50)
         self.sub_delta = self.create_subscription(Float64, 'steering_angle', self.cb_delta, 10)
@@ -56,7 +55,6 @@ class AckermannOdomNode(Node):
         self.delta = float(msg.data)
 
     def cb_imu(self, msg: Imu):
-        # Extract yaw from quaternion
         q = msg.orientation
         quat = [q.x, q.y, q.z, q.w]
         roll, pitch, yaw = tf_transformations.euler_from_quaternion(quat)
@@ -73,7 +71,6 @@ class AckermannOdomNode(Node):
         if dt <= 0.0:
             return
 
-        # Integrate x,y using yaw from IMU and v from encoder
         self.x += self.v * math.cos(self.yaw) * dt
         self.y += self.v * math.sin(self.yaw) * dt
 
@@ -94,7 +91,6 @@ class AckermannOdomNode(Node):
         odom.pose.pose.orientation.w = qw
 
         odom.twist.twist.linear.x = self.v
-        # optional: use bicycle model for yaw_rate estimate from steering for twist.angular.z
         odom.twist.twist.angular.z = (self.v / self.L) * math.tan(self.delta) if abs(self.L) > 1e-6 else 0.0
 
         self.pub_odom.publish(odom)
