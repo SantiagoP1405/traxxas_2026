@@ -14,8 +14,8 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
 // --- PINES ULTRASÓNICOS (ESP32) ---
 const int TRIG_L = 26; const int ECHO_L = 25;
-const int TRIG_C = 14; const int ECHO_C = 27;
-const int TRIG_R = 13; const int ECHO_R = 12;
+const int TRIG_C = 13; const int ECHO_C = 19;
+const int TRIG_R = 14; const int ECHO_R = 27;
 
 // --- PIN INFRARROJO ---
 const int PIN_IR = 33; 
@@ -31,6 +31,13 @@ const int DELAY_US = 100;
 // --- TIMERS PARA MULTITAREA ---
 unsigned long lastSensorTime = 0;
 unsigned long lastBatteryTime = 0;
+
+// ==============================================================
+// FUNCIÓN PARA CORREGIR LA NO LINEALIDAD DEL ADC (y = mx + b)
+// ==============================================================
+float mapFloat(float x, float in_min, float in_max, float out_min, float out_max) {
+  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
 
 // Función para leer batería con filtro
 float leerVoltajeADC(int pin) {
@@ -117,10 +124,18 @@ void loop() {
     float u2 = leerVoltajeADC(PIN_C2);
     float u3 = leerVoltajeADC(PIN_C3);
 
-    // --- Convertir a taps reales con la nueva calibración ---
-    float tap1 = u1 * FACTOR * CAL1;  // T1 es el Total (~12.20V)
-    float tap2 = u2 * FACTOR * CAL2;  // T2 es C1 + C2 (~8.12V)
-    float tap3 = u3 * FACTOR * CAL3;  // T3 es solo C1 (~4.06V)
+    // --- Convertir a taps crudos con la calibración original ---
+    float tap1_crudo = u1 * FACTOR * CAL1;  // T1 es el Total (~12.20V)
+    float tap2_crudo = u2 * FACTOR * CAL2;  // T2 es C1 + C2 (~8.12V)
+    float tap3_crudo = u3 * FACTOR * CAL3;  // T3 es solo C1 (~4.06V)
+
+    // --- Aplicar la corrección de la recta (Interpolación) ---
+    // Sintaxis: mapFloat(valor_crudo, lectura_esp_baja, lectura_esp_alta, real_multimetro_bajo, real_multimetro_alto)
+    float tap1 = mapFloat(tap1_crudo, 10.96f, 12.20f, 11.40f, 12.20f);
+    
+    // Corrección con tus nuevos datos reales (T2 y T3)
+    float tap2 = mapFloat(tap2_crudo, 7.65f, 8.12f, 7.60f, 8.12f);
+    float tap3 = mapFloat(tap3_crudo, 3.85f, 4.06f, 3.80f, 4.06f);
 
     // --- Cálculo real de celdas (¡Adiós negativos!) ---
     float cell1 = tap3;             // C1 directa
