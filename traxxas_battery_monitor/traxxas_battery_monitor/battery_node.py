@@ -11,10 +11,10 @@ class BatteryMonitorNode(Node):
 
         try:
             # Reducimos el timeout para que no bloquee el nodo
-            self.ser = serial.Serial('/dev/ttyUSB0', 115200, timeout=0.05)
+            self.ser = serial.Serial('/dev/ttyUSB1', 115200, timeout=0.05)
             time.sleep(2)
             self.ser.reset_input_buffer()
-            self.get_logger().info("✅ Serial abierto en /dev/ttyACM0")
+            self.get_logger().info("✅ Serial abierto en /dev/ttyUSB1")
         except Exception as e:
             self.get_logger().error(f"❌ No se pudo abrir serial: {e}")
             exit(1)
