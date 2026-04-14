@@ -33,7 +33,7 @@ def generate_launch_description():
 
     return LaunchDescription([
         # -------- Serial / vehicle params --------
-        DeclareLaunchArgument('port', default_value='/dev/ttyACM0'),
+        DeclareLaunchArgument('port', default_value='/dev/ttyACM1'),
         DeclareLaunchArgument('baud', default_value='115200'),
 
         DeclareLaunchArgument('gear_ratio', default_value='15.3'),

@@ -12,7 +12,7 @@ class SerialSensorsNode(Node):
         super().__init__('serial_sensors_node')
 
         # ---------------- Parameters ----------------
-        self.declare_parameter('port', '/dev/ttyACM0')
+        self.declare_parameter('port', '/dev/ttyACM1')
         self.declare_parameter('baud', 115200)
         self.declare_parameter('gear_ratio', 15.3)
         self.declare_parameter('wheel_radius', 0.055)
