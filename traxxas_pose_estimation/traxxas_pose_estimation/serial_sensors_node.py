@@ -60,6 +60,12 @@ class SerialSensorsNode(Node):
 
             # ---------------- Parse CSV ----------------
             omega_motor = float(parts[1])
+            if not math.isfinite(omega_motor):
+                return
+
+            if abs(omega_motor) > 200.0:
+                self.get_logger().warn(f"Discarding absurd omega_motor: {omega_motor}")
+                return
 
             yaw   = float(parts[2])
             pitch = float(parts[3])
