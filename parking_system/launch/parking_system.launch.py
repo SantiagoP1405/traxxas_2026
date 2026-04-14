@@ -24,15 +24,15 @@ def generate_launch_description():
     lidar_launcher = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([
             rplidar_launch_path,
-            '/rplidar_a2m12_launch.py'
+            '/rplidar_a3_launch.py'
         ]), launch_arguments={'serial_port': LaunchConfiguration('lidar_serial_port')}.items()
     )
 
-    # 2. IMU, Odometría y control Serial (El que me pediste agregar)
+    # 2. IMU, Odometría y control Serial (CORREGIDO)
     traxxas_pose_launcher = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([
             traxxas_pose_launch_path,
-            '/bringup_launch.py'
+            '/bringup.launch.py'  # <--- CORREGIDO (antes tenía un guion bajo)
         ])
     )
 
@@ -51,15 +51,15 @@ def generate_launch_description():
 
     parking_controller_traxxas_node = Node(
         package="parking_system",
-        executable="parking_controller_traxxas", # Corregido (antes decía fsm_parking3)
+        executable="parking_controller_traxxas", 
         parameters=[{
-            'serial_port': '/dev/ttyUSB1', 
+            'serial_port': '/dev/trx_ultrasonicos', 
         }]
     )
 
     # --- NODO DE VISIÓN (LANE DETECTOR) ---
     lane_detector_node = Node(
-        package="parking_system", # Cambia esto si lo pusiste en otro paquete
+        package="parking_system", 
         executable="lane_detector_camera", 
         name="lane_detector_camera",
         output="screen"
@@ -83,7 +83,7 @@ def generate_launch_description():
         
         # Nodos propios
         lane_detector_node,     # <-- Cámara ZED
-        lidar_processor_node,   # <-- Agregado para que realmente se ejecute
+        lidar_processor_node,   
         parking_controller_traxxas_node,
         fsm_parking_node
     ])

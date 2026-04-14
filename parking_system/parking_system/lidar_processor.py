@@ -5,10 +5,10 @@ from sensor_msgs.msg import LaserScan
 from std_msgs.msg import String
 import math
 
-FRONT_STOP_DIST = 0.20  #0.5
-RIGHT_FREE_DIST = 0.57 #0.57
-LEFT_FREE_DIST  = 0.57 #0.57
-REAR_FREE_DIST  = 0.20
+FRONT_STOP_DIST = 0.20  #0.20
+RIGHT_FREE_DIST = 0.30 #0.57
+LEFT_FREE_DIST  = 0.40 #0.57
+REAR_FREE_DIST  = 0.20  #0.20
 
 class LidarProcessor(Node):
     def __init__(self):
@@ -43,13 +43,13 @@ class LidarProcessor(Node):
             # 3. Asignamos según los grados 
             # (Ajusta estos rangos si tu LiDAR está montado chueco)
             if 85 < angle_deg < 95:          # Front (90 grados)
-                front.append(r)
-            elif 170 < angle_deg < 190:      # Left  (180 grados)
                 left.append(r)
-            elif 265 < angle_deg < 275:      # Rear  (270 grados)
+            elif 170 < angle_deg < 190:      # Left  (180 grados)
                 rear.append(r)
-            elif angle_deg > 350 or angle_deg < 10: # Right (0 / 360 grados)
+            elif 265 < angle_deg < 275:      # Rear  (270 grados)
                 right.append(r)
+            elif angle_deg > 350 or angle_deg < 10: # Right (0 / 360 grados)
+                front.append(r)
 
         # Evaluamos si está libre superando la distancia mínima
         front_clear = min(front, default=10.0) > FRONT_STOP_DIST

@@ -6,10 +6,10 @@ from std_msgs.msg import String
 from enum import Enum
 import time
 
-DETECT_EXTRA_TIME = 0.3 
-CONFIRM_TIME      = 0.36
+DETECT_EXTRA_TIME = 0.0 
+CONFIRM_TIME      = 0.17    
 WAIT_TIME         = 1.0
-ALEJARSE_TIME     = 0.7   
+ALEJARSE_TIME     = 0.2 #0.77   
 ENTER_TIME        = 3.0   
 PARK_WAIT_TIME    = 1.0
 
