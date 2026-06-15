@@ -363,23 +363,6 @@ def fuse_steering_angles(
     weights /= weights.sum()
 
 
-    # ── 3. Bonus de consenso ──────────────────────────────────────────────────
-    # Si ≥2 estimadores coinciden, se refuerzan mutuamente.
-    # Esto es especialmente valioso cuando la sliding se equivoca en curva:
-    # slope y prev suelen estar de acuerdo → se imponen sobre sliding.
-    BONUS = 0.12
-    bonus = np.zeros(3)
-    for i, j in [(0, 1), (0, 2), (1, 2)]:
-        if available[i] and available[j]:
-            if abs(vals[i] - vals[j]) < CONSENSUS_TOL_DEG:
-                bonus[i] += BONUS
-                bonus[j] += BONUS
-
-
-    weights = weights + bonus * available
-    weights /= weights.sum()
-
-
     # ── 4. Ángulo fusionado ───────────────────────────────────────────────────
     fused = float(np.dot(weights, vals))
     return fused, weights, curve_level
@@ -617,46 +600,8 @@ class LaneDetectorNode(Node):
         sliding_img_left,  warped_left,  warped_bottom_l, roi_l, self.left_curve  = fut_l.result()
         sliding_img_right, warped_right, warped_bottom_r, roi_r, self.right_curve = fut_r.result()
 
-        # ── Kalman 1D Right ───────────────────────────────────────────────────
-        #quedo mal calibrado
-        # raw_right = self.right_curve
-        # if raw_right is None:
-        #     # Sin detección: solo propaga incertidumbre
-        #     if self.kf_x_right is not None:
-        #     self.kf_P_right += self.kf_Q
-        #     self.right_curve = self.kf_x_right
-        # else:
-        #     if self.kf_x_right is None:
-        #     # Primera medición válida: inicializar
-        #     self.kf_x_right = raw_right
-        #     else:
-        #     # Predict
-        #     P_pred          = self.kf_P_right + self.kf_Q
-        #     # Update
-        #     K               = P_pred / (P_pred + self.kf_R)
-        #     self.kf_x_right = self.kf_x_right + K * (raw_right - self.kf_x_right)
-        #     self.kf_P_right = (1 - K) * P_pred
-        #     self.right_curve = self.kf_x_right
 
-
-        # ── Kalman 1D Left ────────────────────────────────────────────────────
-        # raw_left = self.left_curve
-        # if raw_left is None:
-        #     if self.kf_x_left is not None:
-        #     self.kf_P_left += self.kf_Q
-        #     self.left_curve = self.kf_x_left
-        # else:
-        #     if self.kf_x_left is None:
-        #     self.kf_x_left = raw_left
-        #     else:
-        #     P_pred         = self.kf_P_left + self.kf_Q
-        #     K              = P_pred / (P_pred + self.kf_R)
-        #     self.kf_x_left = self.kf_x_left + K * (raw_left - self.kf_x_left)
-        #     self.kf_P_left = (1 - K) * P_pred
-        #     self.left_curve = self.kf_x_left
-
-
-        ## ── Factor 1: Sliding window (curvatura, con Kalman ya aplicado) ─────
+        ## ── Factor 1: Sliding window ─────
         sliding_delta = signed_delta_from_curvature(self.left_curve, self.right_curve)
         #ganancia empirica 
         SLIDING_GAIN = 2.5
@@ -677,12 +622,8 @@ class LaneDetectorNode(Node):
         # ── Fusión adaptativa ─────────────────────────────────────────────────
         fused_delta, weights, curve_level = fuse_steering_angles(sliding_delta, slope_delta, prev_delta)
 
-        # Actualizar historial
-        DECAY_RATE = 0.65
-        if abs(fused_delta) < CURVE_THRESHOLD_DEG:
-            self.prev_steering_deg = fused_delta * DECAY_RATE
-        else:
-            self.prev_steering_deg = fused_delta
+
+        self.prev_steering_deg = fused_delta
 
         if DEBUG_FILE:
             # ── Convertir a PWM ───────────────────────────────────────────────────
