@@ -7,6 +7,10 @@
   <maintainer email="A01735171@tec.mx">santiago_gomez</maintainer>
   <license>Apache-2.0</license>
 
+  <exec_depend>joy</exec_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>
   <test_depend>ament_pep257</test_depend>
