@@ -7,9 +7,9 @@ from enum import Enum
 import time
 
 DETECT_EXTRA_TIME = 0.0 
-CONFIRM_TIME      = 0.17    
+CONFIRM_TIME      = 0.12    
 WAIT_TIME         = 1.0
-ALEJARSE_TIME     = 0.2 #0.77   
+ALEJARSE_TIME     = 0.3 #0.77   
 ENTER_TIME        = 3.0   
 PARK_WAIT_TIME    = 1.0
 
@@ -108,11 +108,18 @@ class ParkingFSM3(Node):
         now = time.time()
 
         if self.state == State.BUSCAR and self.detect_start_time:
-            if now - self.detect_start_time > DETECT_EXTRA_TIME:
+            # --- NUEVA LÓGICA DE TIEMPO DINÁMICO ---
+            tiempo_extra = DETECT_EXTRA_TIME
+            if self.box_side == 'RIGHT':
+                tiempo_extra = DETECT_EXTRA_TIME * 1.0  # Multiplica x2 si es a la derecha
+            # ---------------------------------------
+
+            # Usamos nuestra nueva variable 'tiempo_extra' en lugar de la constante fija
+            if now - self.detect_start_time > tiempo_extra:
                 self.state             = State.ESPERAR
                 self.wait_start_time   = now
                 self.detect_start_time = None
-                self.get_logger().info('BUSCAR -> ESPERAR')
+                self.get_logger().info(f'BUSCAR -> ESPERAR (Tiempo extra aplicado: {tiempo_extra}s)')
                 self.publish_state()
 
         elif self.state == State.ESPERAR and self.wait_start_time:

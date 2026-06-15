@@ -7,7 +7,7 @@ import math
 
 FRONT_STOP_DIST = 0.20  #0.20
 RIGHT_FREE_DIST = 0.30 #0.57
-LEFT_FREE_DIST  = 0.40 #0.57
+LEFT_FREE_DIST  = 0.30 #0.57
 REAR_FREE_DIST  = 0.20  #0.20
 
 class LidarProcessor(Node):
