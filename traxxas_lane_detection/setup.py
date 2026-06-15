@@ -24,10 +24,11 @@ setup(
     },
     entry_points={
         'console_scripts': [
-        'lane_detector_node = traxxas_lane_detection.lane_detector_node:main',
         'lane_detector_yolo = traxxas_lane_detection.lane_detector_yolo:main',
         'jetson_transmisor = traxxas_lane_detection.jetson_transmisor:main',
-        'jetson_transmisor_edit = traxxas_lane_detection.jetson_transmisor_edit:main',
+        'jetson_transmisor_point_cloud = traxxas_lane_detection.jetson_transmisorWithPointCloud:main',
+        'lane_detector_yolo_external = traxxas_lane_detection.lane_detector_yolo_external:main',
+        'lane_detector_pure_pursuit = traxxas_lane_detection.lane_detector_purePursuit:main
         ],
     },
 )
