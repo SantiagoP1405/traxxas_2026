@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import math
 import rclpy
 from rclpy.node import Node
@@ -24,69 +26,75 @@ class PoseTraxxas(Node):
         self.declare_parameter('imu_topic', '/imu/data')
         self.declare_parameter('pose_topic', '/pose_traxxas')
         self.declare_parameter('frame_id', 'traxxas_pose')
-        self.declare_parameter('publish_rate', 50.0)
+
         self.declare_parameter('velocity_deadband', 0.01)
         self.declare_parameter('calibrate_yaw_on_start', True)
         self.declare_parameter('normalize_to_pi', True)
+
+        self.declare_parameter('max_dt', 0.5)
+        self.declare_parameter('min_dt', 0.0005)
+
+        self.declare_parameter('print_debug', True)
 
         twist_topic = self.get_parameter('twist_topic').value
         imu_topic = self.get_parameter('imu_topic').value
         pose_topic = self.get_parameter('pose_topic').value
         self.frame_id = self.get_parameter('frame_id').value
-        publish_rate = float(self.get_parameter('publish_rate').value)
 
         self.velocity_deadband = float(self.get_parameter('velocity_deadband').value)
         self.calibrate_yaw_on_start = bool(self.get_parameter('calibrate_yaw_on_start').value)
         self.normalize_to_pi = bool(self.get_parameter('normalize_to_pi').value)
 
+        self.max_dt = float(self.get_parameter('max_dt').value)
+        self.min_dt = float(self.get_parameter('min_dt').value)
+
+        self.print_debug = bool(self.get_parameter('print_debug').value)
+
         # ---------- State ----------
         self.x = 0.0
         self.y = 0.0
-        self.theta = 0.0
+        self.theta = 0.0          # pose heading used for integration [rad]
+        self.theta_imu = 0.0      # latest IMU heading [rad]
+        self.velocity = 0.0       # latest linear velocity [m/s]
 
-        self.velocity = 0.0
-        self.theta_imu = 0.0
-
-        self.last_time = None
-
-        self.theta_offset = None
+        self.theta_offset = 0.0
         self.calibrated = False
         self.has_imu = False
         self.has_twist = False
+
+        self.last_twist_time = None
 
         # ---------- Subscribers ----------
         self.twist_sub = self.create_subscription(
             TwistStamped,
             twist_topic,
             self.twist_callback,
-            10
+            20
         )
 
         self.imu_sub = self.create_subscription(
             Imu,
             imu_topic,
             self.imu_callback,
-            10
+            20
         )
 
         # ---------- Publisher ----------
         self.pose_pub = self.create_publisher(
             Vector3Stamped,
             pose_topic,
-            10
+            20
         )
-
-        # ---------- Timer ----------
-        period = 1.0 / publish_rate
-        self.timer = self.create_timer(period, self.update_pose)
 
         self.get_logger().info('==========================================')
         self.get_logger().info(' POSE_TRAXXAS NODE STARTED')
         self.get_logger().info(f' Subscribed twist: {twist_topic}')
         self.get_logger().info(f' Subscribed imu:   {imu_topic}')
         self.get_logger().info(f' Publishing pose:  {pose_topic}')
+        self.get_logger().info(' Integración sobre llegada de Twist')
         self.get_logger().info('==========================================')
 
+    # -------------------------------------------------
     @staticmethod
     def quaternion_to_yaw(x: float, y: float, z: float, w: float) -> float:
         """
@@ -115,10 +123,11 @@ class PoseTraxxas(Node):
             angle += 2.0 * math.pi
         return angle
 
-    def twist_callback(self, msg: TwistStamped):
-        self.velocity = msg.twist.linear.x
-        self.has_twist = True
+    @staticmethod
+    def stamp_to_seconds(stamp) -> float:
+        return float(stamp.sec) + float(stamp.nanosec) * 1e-9
 
+    # -------------------------------------------------
     def imu_callback(self, msg: Imu):
         q = msg.orientation
 
@@ -146,35 +155,48 @@ class PoseTraxxas(Node):
 
         self.has_imu = True
 
-    def update_pose(self):
-        current_time = self.get_clock().now()
+    # -------------------------------------------------
+    def twist_callback(self, msg: TwistStamped):
+        self.velocity = msg.twist.linear.x
+        self.has_twist = True
 
-        if self.last_time is None:
-            self.last_time = current_time
+        # Necesitamos IMU para saber hacia dónde proyectar
+        if not self.has_imu:
             return
 
-        dt = (current_time - self.last_time).nanoseconds / 1e9
-        self.last_time = current_time
+        # Timestamp del Twist
+        current_time = self.stamp_to_seconds(msg.header.stamp)
 
-        if dt <= 0.0 or dt > 1.0:
+        # Si el stamp viene en cero, usa el reloj ROS actual
+        if current_time <= 0.0:
+            now_msg = self.get_clock().now().to_msg()
+            current_time = self.stamp_to_seconds(now_msg)
+
+        # Primera muestra: solo inicializa tiempo
+        if self.last_twist_time is None:
+            self.last_twist_time = current_time
             return
 
-        if not self.has_imu or not self.has_twist:
+        dt = current_time - self.last_twist_time
+        self.last_twist_time = current_time
+
+        if dt < self.min_dt or dt > self.max_dt:
+            self.get_logger().warn(f'dt fuera de rango: {dt:.6f} s — descartado')
             return
 
-        # Use IMU heading directly
+        # Heading actual desde IMU
         self.theta = self.theta_imu
 
-        # Small deadband to reduce drift when nearly stopped
+        # Deadband de velocidad
         v = 0.0 if abs(self.velocity) < self.velocity_deadband else self.velocity
 
-        # Dead-reckoning integration
+        # Integración planar
         self.x += v * math.cos(self.theta) * dt
         self.y += v * math.sin(self.theta) * dt
 
-        # Publish pose
+        # Publicar pose
         pose_msg = Vector3Stamped()
-        pose_msg.header.stamp = current_time.to_msg()
+        pose_msg.header = msg.header
         pose_msg.header.frame_id = self.frame_id
         pose_msg.vector.x = self.x
         pose_msg.vector.y = self.y
@@ -182,14 +204,14 @@ class PoseTraxxas(Node):
 
         self.pose_pub.publish(pose_msg)
 
-        # Useful terminal print
-        theta_deg = math.degrees(self.theta)
-        print(
-            f"\rPose -> X={self.x:.3f} m | Y={self.y:.3f} m | "
-            f"Theta={self.theta:.3f} rad ({theta_deg:.1f} deg) | "
-            f"V={v:.3f} m/s",
-            end=''
-        )
+        if self.print_debug:
+            theta_deg = math.degrees(self.theta)
+            print(
+                f"\rPose -> X={self.x:.3f} m | Y={self.y:.3f} m | "
+                f"Theta={self.theta:.3f} rad ({theta_deg:.1f} deg) | "
+                f"V={v:.3f} m/s | dt={dt:.4f} s",
+                end=''
+            )
 
 
 def main(args=None):
