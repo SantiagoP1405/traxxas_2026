@@ -28,7 +28,7 @@ setup(
         'jetson_transmisor = traxxas_lane_detection.jetson_transmisor:main',
         'jetson_transmisor_point_cloud = traxxas_lane_detection.jetson_transmisorWithPointCloud:main',
         'lane_detector_yolo_external = traxxas_lane_detection.lane_detector_yolo_external:main',
-        'lane_detector_pure_pursuit = traxxas_lane_detection.lane_detector_purePursuit:main
+        'lane_detector_pure_pursuit = traxxas_lane_detection.lane_detector_purePursuit:main',
         ],
     },
 )
