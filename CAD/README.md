@@ -1,5 +1,6 @@
 # CAD MODELS
->Main contributors: Santiago Patricio Gómez Ochoa | 
+>Main contributors: Santiago Patricio Gómez Ochoa | Ayleen Osnaya Ortega | Mariana Manjarrez Lima
+
 These folders contain the base files of the CAD models designed for each stage of the **TRAXXAS** robot. Each version changed based on the required hardware, physical limitations and other basic needs that were covered over time. 
 
 For each version the following subfolders will be found (unless they were not required):
