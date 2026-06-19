@@ -63,7 +63,7 @@ training runs.
 
 ### 1. Lane segmentation dataset (`cacahuate-v2`)
 - Class: `carril`
-- **Link:** _(pegar aquí el link del workspace/proyecto de Roboflow)_
+- **Link:** _https://universe.roboflow.com/darios-workspace-mlife/cacahuate_
 
 ### 2. Stop / crosswalk dataset (`Crosswalk-2`)
 - Classes: `Stop`, `crosswalk`
