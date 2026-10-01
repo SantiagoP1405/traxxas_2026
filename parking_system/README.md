@@ -91,6 +91,7 @@ The package includes standalone nodes to isolate and diagnose physical issues on
 *   **`test_sensors.py`:** Monitor to exclusively visualize the Serial connection, cleanly displaying ultrasonic and IR sensor responses while validating battery voltage status.
 *   **`test_motors.py`:** Non-blocking console interface that allows assigning continuous open-loop speeds and instantly brakes the vehicle by pressing the "a" key.
 *   **`test_freno.py`:** Specialized test to calibrate slow reverse and validate total emergency stops; permanently halts the software if the center sensor locates an obstacle closer than 8 cm.
+*   **`correction_test.py`:** This script is used to test and calibrate the vehicle's lateral correction behavior based on the ultrasonic sensors.
 
 ---
 
