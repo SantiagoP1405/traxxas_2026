@@ -95,6 +95,16 @@ The package includes standalone nodes to isolate and diagnose physical issues on
 
 ---
 
+### File Organization and Versioning Strategy
+
+To maintain a clean and comprehensible repository, obsolete iterations have been removed. The repository currently retains only the definitive scripts that guarantee system functionality across different hardware platforms:
+
+*   **Scripts with the `_28` suffix (e.g., `lane_detector_camara_28.py`, `parking_controller_28.py`):**
+    These files represent the definitive versions deployed exclusively on the Traxxas platform. They encompass the final control logic, kinematics, and vision processing algorithms (including ZED camera integration) that were validated on the physical hardware. The "28" nomenclature designates this specific suite of nodes as the final operational environment for the Traxxas vehicle.
+
+*   **`parking_controller5.py`:**
+    This script is the final, fully functional controller designed specifically for the QCar platform. While the project subsequently transitioned to the Traxxas hardware, this file is preserved as the structural and logical foundation upon which later controllers were built. It remains the primary reference point for any future development involving the QCar.
+
 ## Build & Run
 
 **Build the package in ROS2:**
